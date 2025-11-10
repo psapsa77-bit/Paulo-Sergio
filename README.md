@@ -6,9 +6,11 @@ Aplicativo completo para ler, analisar e explicar rescisões trabalhistas brasil
 
 - ✅ **Análise Completa**: Processa todos os componentes de uma rescisão trabalhista
 - 📊 **Explicações Detalhadas**: Explica cada verba e desconto de forma clara e didática
+- 🌐 **Interface Web**: Interface web moderna e intuitiva com Streamlit
 - 📄 **Relatórios HTML**: Gera relatórios visuais e interativos em HTML
 - 📑 **Relatórios PDF**: Converte relatórios para PDF profissional
 - 💻 **Interface CLI**: Interface de linha de comando fácil de usar
+- 📈 **Gráficos Interativos**: Visualizações com Plotly na interface web
 - 🎨 **Visual Atraente**: Design moderno e responsivo para os relatórios
 - 📚 **Tipos de Rescisão**: Suporta todos os tipos (sem justa causa, com justa causa, pedido de demissão, acordo)
 
@@ -38,7 +40,37 @@ pip install -r requirements.txt
 
 ## 📖 Como Usar
 
-### 1. Criar um Arquivo de Exemplo
+### Modo 1: Interface Web (Recomendado) 🌐
+
+A interface web oferece a experiência mais completa e visual:
+
+```bash
+# Instalar dependências
+pip install -r requirements.txt
+
+# Iniciar a interface web
+python run_web.py
+
+# OU diretamente com streamlit
+streamlit run labor_termination_analyzer/web.py
+```
+
+A aplicação abrirá automaticamente no navegador em `http://localhost:8501`
+
+**Funcionalidades da Interface Web:**
+
+- 📤 **Upload de arquivo JSON** ou entrada manual via formulário
+- 📊 **Visualização em tempo real** da análise
+- 📈 **Gráficos interativos** das verbas e totais
+- 📥 **Download direto** de relatórios HTML, PDF e JSON
+- 💡 **Interface intuitiva** com validação de dados
+- 🎨 **Design responsivo** e moderno
+
+### Modo 2: Linha de Comando (CLI) 💻
+
+Para uso rápido via terminal:
+
+#### 1. Criar um Arquivo de Exemplo
 
 ```bash
 rescisao exemplo
@@ -46,7 +78,7 @@ rescisao exemplo
 
 Isso criará um arquivo `exemplo_rescisao.json` com dados de exemplo.
 
-### 2. Analisar uma Rescisão
+#### 2. Analisar uma Rescisão
 
 ```bash
 # Mostrar análise no terminal
@@ -62,7 +94,36 @@ rescisao analisar exemplo_rescisao.json --pdf relatorio.pdf
 rescisao analisar exemplo_rescisao.json --html relatorio.html --pdf relatorio.pdf
 ```
 
-### 3. Formato do Arquivo JSON
+### Modo 3: Uso Programático (API Python) 🐍
+
+Você também pode usar o aplicativo como biblioteca Python:
+
+```python
+from labor_termination_analyzer import (
+    RescisaoParser,
+    RescisaoAnalyzer,
+    HTMLGenerator,
+    PDFGenerator
+)
+
+# Parse de dados
+rescisao = RescisaoParser.from_json_file("dados.json")
+
+# Análise
+analyzer = RescisaoAnalyzer(rescisao)
+resumo = analyzer.gerar_resumo_completo()
+
+# Gerar relatórios
+html_gen = HTMLGenerator()
+html_gen.gerar(rescisao, "relatorio.html")
+
+pdf_gen = PDFGenerator()
+pdf_gen.gerar(rescisao, "relatorio.pdf")
+```
+
+---
+
+## 📋 Formato do Arquivo JSON
 
 O arquivo JSON deve conter os seguintes campos:
 
@@ -157,32 +218,17 @@ Os relatórios gerados incluem:
 - 📋 Informações completas do funcionário
 - 💰 Resumo financeiro destacado
 
-## 🔧 Uso Programático
+### Interface Web
 
-Você também pode usar o aplicativo como biblioteca Python:
+A interface web oferece:
 
-```python
-from labor_termination_analyzer import (
-    RescisaoParser,
-    RescisaoAnalyzer,
-    HTMLGenerator,
-    PDFGenerator
-)
-
-# Parse de dados
-rescisao = RescisaoParser.from_json_file("dados.json")
-
-# Análise
-analyzer = RescisaoAnalyzer(rescisao)
-resumo = analyzer.gerar_resumo_completo()
-
-# Gerar relatórios
-html_gen = HTMLGenerator()
-html_gen.gerar(rescisao, "relatorio.html")
-
-pdf_gen = PDFGenerator()
-pdf_gen.gerar(rescisao, "relatorio.pdf")
-```
+- 🌐 Acesso via navegador (localhost:8501)
+- 📊 Visualização em tempo real dos dados
+- 📈 Gráficos interativos com Plotly (pizza e barras)
+- 📤 Upload de JSON ou formulário manual completo
+- 💾 Download instantâneo de HTML, PDF e JSON
+- ✨ Validação de dados em tempo real
+- 🎨 Design moderno e responsivo
 
 ## 📚 Documentação das Verbas
 
