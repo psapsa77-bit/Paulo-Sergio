@@ -13,7 +13,8 @@ Aplicativo completo para ler, analisar e explicar rescisões trabalhistas brasil
 ```
 1️⃣ Duplo clique em: INSTALAR_WINDOWS.bat (ou instalar.sh no Mac/Linux)
 2️⃣ Duplo clique em: ABRIR_PROGRAMA.bat (ou abrir.sh)
-3️⃣ Preencha o formulário na tela e baixe o PDF!
+3️⃣ Faça upload do PDF da rescisão OU preencha o formulário
+4️⃣ Baixe o relatório em PDF!
 ```
 
 📖 **Leia o arquivo:** [COMO_USAR.md](COMO_USAR.md) - Guia passo a passo com prints
@@ -24,6 +25,8 @@ Aplicativo completo para ler, analisar e explicar rescisões trabalhistas brasil
 
 ## 🎯 Funcionalidades
 
+- 🎉 **NOVO! Extração de PDF**: Extrai dados automaticamente de PDFs de rescisão trabalhista
+- 🔍 **OCR Integrado**: Suporta PDFs escaneados com reconhecimento óptico de caracteres
 - ✅ **Análise Completa**: Processa todos os componentes de uma rescisão trabalhista
 - 📊 **Explicações Detalhadas**: Explica cada verba e desconto de forma clara e didática
 - 🌐 **Interface Web**: Interface web moderna e intuitiva com Streamlit

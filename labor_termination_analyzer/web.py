@@ -14,6 +14,7 @@ from .models import RescisaoTrabalhista, Funcionario, Verbas, Descontos
 from .parser import RescisaoParser
 from .analyzer import RescisaoAnalyzer
 from .generators import HTMLGenerator, PDFGenerator
+from .pdf_extractor import PDFExtractor
 
 
 def formatar_moeda(valor: Decimal) -> str:
@@ -91,14 +92,90 @@ def main():
         st.header("⚙️ Opções")
         modo = st.radio(
             "Escolha o modo de entrada:",
-            ["Upload de Arquivo JSON", "Formulário Manual"],
+            ["Upload de PDF (NOVO!)", "Upload de Arquivo JSON", "Formulário Manual"],
             help="Escolha como deseja inserir os dados da rescisão"
         )
 
     rescisao = None
 
+    # Modo de Upload de PDF
+    if modo == "Upload de PDF (NOVO!)":
+        st.header("📄 Upload de PDF de Rescisão Trabalhista")
+
+        st.info(
+            "🎉 **NOVO!** Agora você pode fazer upload direto do PDF da rescisão!\n\n"
+            "O sistema vai extrair automaticamente:\n"
+            "- Nome, CPF, cargo do funcionário\n"
+            "- Datas de admissão e demissão\n"
+            "- Valores de verbas e descontos\n"
+            "- Tipo de rescisão"
+        )
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            uploaded_file = st.file_uploader(
+                "Faça upload do PDF da rescisão trabalhista",
+                type=['pdf'],
+                help="Selecione o arquivo PDF da rescisão"
+            )
+
+        with col2:
+            usar_ocr = st.checkbox(
+                "PDF Escaneado?",
+                value=False,
+                help="Marque se o PDF for uma imagem escaneada (mais lento)"
+            )
+
+            st.warning("⚠️ **OCR requer:**\nTesseract instalado no sistema")
+
+        if uploaded_file is not None:
+            try:
+                with st.spinner("🔍 Extraindo dados do PDF..."):
+                    # Salvar temporariamente
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                        tmp.write(uploaded_file.read())
+                        tmp_path = tmp.name
+
+                    # Extrair dados
+                    extractor = PDFExtractor()
+                    dados_pdf = extractor.extrair_de_pdf(tmp_path, usar_ocr=usar_ocr)
+
+                    # Remover arquivo temporário
+                    Path(tmp_path).unlink()
+
+                # Mostrar dados extraídos para revisão
+                with st.expander("📝 Dados Extraídos (Clique para Revisar/Editar)", expanded=True):
+                    st.warning("⚠️ **IMPORTANTE:** Revise os dados extraídos antes de continuar!")
+
+                    # Exibir texto extraído
+                    if st.checkbox("Ver texto completo extraído"):
+                        st.text_area("Texto do PDF", extractor.obter_texto_completo(), height=200)
+
+                    st.subheader("Dados Identificados:")
+                    st.json(dados_pdf)
+
+                # Botão para processar
+                if st.button("✅ Confirmar e Analisar Dados Extraídos", type="primary", use_container_width=True):
+                    try:
+                        # Converter para formato do parser
+                        rescisao = RescisaoParser.from_dict(dados_pdf)
+                        st.success("✅ Dados processados com sucesso!")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao processar dados: {str(e)}")
+                        st.info("💡 Tente ajustar os valores manualmente ou use o Formulário Manual")
+
+            except Exception as e:
+                st.error(f"❌ Erro ao extrair dados do PDF: {str(e)}")
+                st.info(
+                    "💡 **Dicas:**\n"
+                    "- Verifique se o PDF não está protegido/criptografado\n"
+                    "- Se for PDF escaneado, marque a opção 'PDF Escaneado?'\n"
+                    "- Ou use a opção 'Formulário Manual' para preencher os dados"
+                )
+
     # Modo de Upload de Arquivo
-    if modo == "Upload de Arquivo JSON":
+    elif modo == "Upload de Arquivo JSON":
         st.header("📤 Upload de Arquivo JSON")
 
         col1, col2 = st.columns([2, 1])

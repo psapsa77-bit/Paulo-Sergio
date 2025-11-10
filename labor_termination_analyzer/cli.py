@@ -15,6 +15,7 @@ from rich import box
 from .parser import RescisaoParser
 from .analyzer import RescisaoAnalyzer
 from .generators import HTMLGenerator, PDFGenerator
+from .pdf_extractor import PDFExtractor
 
 app = typer.Typer(
     name="rescisao",
@@ -144,6 +145,110 @@ def criar_exemplo(
     console.print(f"\n[green]✓ Arquivo de exemplo criado:[/green] {output}")
     console.print("\n[cyan]Para analisar este exemplo, execute:[/cyan]")
     console.print(f"  rescisao analisar {output}\n")
+
+
+@app.command("extrair-pdf")
+def extrair_pdf(
+    arquivo_pdf: Path = typer.Argument(
+        ...,
+        help="Caminho para o arquivo PDF da rescisão",
+        exists=True
+    ),
+    output_json: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Caminho para salvar o JSON extraído"
+    ),
+    usar_ocr: bool = typer.Option(
+        False,
+        "--ocr",
+        help="Usar OCR para PDFs escaneados (requer Tesseract instalado)"
+    ),
+    analisar: bool = typer.Option(
+        False,
+        "--analisar",
+        "-a",
+        help="Analisar automaticamente após extração"
+    )
+):
+    """
+    Extrai dados de um PDF de rescisão trabalhista
+
+    Exemplo de uso:
+
+        rescisao extrair-pdf rescisao.pdf --output dados.json
+        rescisao extrair-pdf rescisao.pdf --analisar
+    """
+    import json
+
+    try:
+        console.print(f"\n[cyan]📄 Extraindo dados do PDF:[/cyan] {arquivo_pdf}")
+
+        if usar_ocr:
+            console.print("[yellow]⚠️  Modo OCR ativado (pode demorar mais)[/yellow]")
+
+        # Extrair dados
+        extractor = PDFExtractor()
+        dados = extractor.extrair_de_pdf(arquivo_pdf, usar_ocr=usar_ocr)
+
+        console.print("[green]✓ Dados extraídos com sucesso![/green]\n")
+
+        # Mostrar resumo
+        console.print("[bold yellow]📋 Dados Identificados:[/bold yellow]")
+        func = dados.get('funcionario', {})
+
+        table = Table(show_header=False, box=box.SIMPLE)
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor", style="white")
+
+        table.add_row("Nome", func.get('nome', 'Não identificado'))
+        table.add_row("CPF", func.get('cpf', 'Não identificado'))
+        table.add_row("Cargo", func.get('cargo', 'Não identificado'))
+        table.add_row("Tipo Rescisão", dados.get('tipo_rescisao', 'Não identificado'))
+
+        console.print(table)
+
+        # Salvar JSON se solicitado
+        if output_json:
+            with open(output_json, 'w', encoding='utf-8') as f:
+                json.dump(dados, f, ensure_ascii=False, indent=2)
+            console.print(f"\n[green]✓ JSON salvo em:[/green] {output_json}")
+
+        # Analisar se solicitado
+        if analisar:
+            console.print("\n[cyan]🔍 Analisando dados extraídos...[/cyan]\n")
+
+            rescisao = RescisaoParser.from_dict(dados)
+            analyzer = RescisaoAnalyzer(rescisao)
+            resumo = analyzer.gerar_resumo_completo()
+
+            _exibir_analise_terminal(resumo)
+
+        console.print("\n[bold green]✓ Extração concluída![/bold green]")
+
+        if not analisar and not output_json:
+            console.print("\n[yellow]💡 Dica:[/yellow]")
+            console.print("  Use --output para salvar o JSON extraído")
+            console.print("  Use --analisar para ver a análise completa")
+
+        console.print()
+
+    except FileNotFoundError:
+        console.print(f"[bold red]✗ Erro:[/bold red] Arquivo não encontrado: {arquivo_pdf}")
+        sys.exit(1)
+    except ImportError as e:
+        console.print(f"[bold red]✗ Erro:[/bold red] {str(e)}")
+        console.print("\n[yellow]Para usar OCR, instale:[/yellow]")
+        console.print("  pip install pytesseract pdf2image")
+        console.print("\nE instale o Tesseract OCR:")
+        console.print("  Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-por")
+        console.print("  Mac: brew install tesseract tesseract-lang")
+        console.print("  Windows: https://github.com/UB-Mannheim/tesseract/wiki")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]✗ Erro:[/bold red] {str(e)}")
+        sys.exit(1)
 
 
 def _exibir_analise_terminal(resumo: dict):

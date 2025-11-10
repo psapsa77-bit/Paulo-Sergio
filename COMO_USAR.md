@@ -25,9 +25,31 @@
 
 ## 🎯 Como Usar o Programa (na tela do navegador)
 
-### Opção 1: Preencher Formulário (MAIS FÁCIL)
+### Opção 1: Upload de PDF (NOVO! MAIS FÁCIL!) 🎉
 
-1. Na tela que abrir, você verá duas opções na lateral esquerda
+**Se você já tem o PDF da rescisão:**
+
+1. Na tela que abrir, você verá três opções na lateral esquerda
+2. Escolha: **"Upload de PDF (NOVO!)"**
+3. Clique em **"Browse files"** (Procurar arquivos)
+4. Selecione o PDF da rescisão
+5. **Pronto!** O programa extrai automaticamente:
+   - Nome, CPF, cargo do funcionário
+   - Datas de admissão e demissão
+   - Valores de verbas (salário, férias, 13º, FGTS...)
+   - Valores de descontos (INSS, IR...)
+6. Revise os dados extraídos (eles aparecem na tela)
+7. Clique em **"✅ Confirmar e Analisar Dados Extraídos"**
+8. Veja a análise completa com gráficos
+9. Baixe o relatório em PDF
+
+**DICA:** Se o PDF for uma imagem escaneada, marque a opção "PDF Escaneado?" (vai demorar um pouco mais)
+
+---
+
+### Opção 2: Preencher Formulário Manual
+
+1. Na tela que abrir, você verá três opções na lateral esquerda
 2. Escolha: **"Formulário Manual"**
 3. Preencha os dados:
    - **Nome do funcionário**
@@ -53,7 +75,9 @@
    - Clique em **"📑 Baixar Relatório PDF"** para ter um arquivo bonito
    - O arquivo vai para a pasta "Downloads" do seu computador
 
-### Opção 2: Usar Arquivo JSON (precisa já ter um arquivo pronto)
+---
+
+### Opção 3: Usar Arquivo JSON (precisa já ter um arquivo pronto)
 
 1. Na lateral esquerda, escolha: **"Upload de Arquivo JSON"**
 2. Clique em **"Browse files"** (Procurar arquivos)
