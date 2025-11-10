@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Rescisão Trabalhista - {{ funcionario.nome }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #2c3e50;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            font-size: 1.8em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        h3 {
+            color: #16a085;
+            font-size: 1.3em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .info-section {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            padding: 10px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-size: 1.1em;
+            margin-top: 5px;
+        }
+
+        .tipo-rescisao {
+            background: #3498db;
+            color: white;
+            padding: 25px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+
+        .tipo-rescisao h3 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .direitos-lista {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        .direitos-lista li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .direitos-lista li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #2ecc71;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .verba-card, .desconto-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .verba-card:hover, .desconto-card:hover {
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+
+        .verba-header, .desconto-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .verba-titulo, .desconto-titulo {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .verba-valor {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #27ae60;
+        }
+
+        .desconto-valor {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .verba-descricao, .desconto-descricao {
+            color: #555;
+            margin-bottom: 10px;
+            line-height: 1.8;
+        }
+
+        .verba-calculo, .desconto-calculo {
+            background: #f8f9fa;
+            padding: 10px;
+            border-left: 4px solid #3498db;
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .totais {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+
+        .totais h2 {
+            color: white;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            margin-top: 0;
+        }
+
+        .totais-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .total-item {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+
+        .total-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .total-valor {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .valor-liquido {
+            background: rgba(46, 204, 113, 0.2);
+            border: 2px solid #2ecc71;
+        }
+
+        .observacoes {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .observacoes h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            .verba-card:hover, .desconto-card:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 Análise de Rescisão Trabalhista</h1>
+            <p>Documento explicativo detalhado</p>
+        </header>
+
+        <!-- Informações do Funcionário -->
+        <section class="info-section">
+            <h2>👤 Dados do Funcionário</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Nome</div>
+                    <div class="info-value">{{ funcionario.nome }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">CPF</div>
+                    <div class="info-value">{{ funcionario.cpf }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Cargo</div>
+                    <div class="info-value">{{ funcionario.cargo }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Data de Admissão</div>
+                    <div class="info-value">{{ funcionario.data_admissao }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Data de Demissão</div>
+                    <div class="info-value">{{ funcionario.data_demissao }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Tempo de Serviço</div>
+                    <div class="info-value">{{ funcionario.tempo_servico }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Salário Bruto</div>
+                    <div class="info-value">{{ funcionario.salario_bruto }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tipo de Rescisão -->
+        <section class="tipo-rescisao">
+            <h3>📑 {{ tipo_rescisao.nome }}</h3>
+            <p>{{ tipo_rescisao.descricao }}</p>
+
+            {% if tipo_rescisao.direitos %}
+            <h4 style="margin-top: 20px; color: white;">Direitos do Trabalhador neste Tipo de Rescisão:</h4>
+            <ul class="direitos-lista">
+                {% for direito in tipo_rescisao.direitos %}
+                <li>{{ direito }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </section>
+
+        <!-- Verbas Rescisórias -->
+        <section>
+            <h2>💰 Verbas Rescisórias (Valores a Receber)</h2>
+            {% for verba in verbas %}
+            <div class="verba-card">
+                <div class="verba-header">
+                    <div class="verba-titulo">{{ verba.titulo }}</div>
+                    <div class="verba-valor">{{ verba.valor_formatado }}</div>
+                </div>
+                <div class="verba-descricao">{{ verba.descricao }}</div>
+                <div class="verba-calculo">
+                    <strong>Como é calculado:</strong> {{ verba.calculo }}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+
+        <!-- Descontos -->
+        {% if descontos %}
+        <section>
+            <h2>➖ Descontos</h2>
+            {% for desconto in descontos %}
+            <div class="desconto-card">
+                <div class="desconto-header">
+                    <div class="desconto-titulo">{{ desconto.titulo }}</div>
+                    <div class="desconto-valor">{{ desconto.valor_formatado }}</div>
+                </div>
+                <div class="desconto-descricao">{{ desconto.descricao }}</div>
+                <div class="desconto-calculo">
+                    <strong>Como é calculado:</strong> {{ desconto.calculo }}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        <!-- Totais -->
+        <section class="totais">
+            <h2>💵 Resumo Financeiro</h2>
+            <div class="totais-grid">
+                <div class="total-item">
+                    <div class="total-label">Total de Verbas</div>
+                    <div class="total-valor">{{ totais.total_verbas_formatado }}</div>
+                </div>
+                <div class="total-item">
+                    <div class="total-label">Total de Descontos</div>
+                    <div class="total-valor">{{ totais.total_descontos_formatado }}</div>
+                </div>
+                <div class="total-item valor-liquido">
+                    <div class="total-label">Valor Líquido a Receber</div>
+                    <div class="total-valor">{{ totais.valor_liquido_formatado }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Observações -->
+        {% if observacoes %}
+        <section class="observacoes">
+            <h3>⚠️ Observações</h3>
+            <p>{{ observacoes }}</p>
+        </section>
+        {% endif %}
+
+        <footer>
+            <p>Documento gerado automaticamente pelo Labor Termination Analyzer</p>
+            <p>Este documento tem caráter informativo e explicativo.</p>
+        </footer>
+    </div>
+</body>
+</html>

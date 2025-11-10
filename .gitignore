@@ -49,7 +49,8 @@ output/
 *.html
 *.pdf
 
-# Except example output
+# Except templates and example output
+!labor_termination_analyzer/templates/*.html
 !labor_termination_analyzer/examples/*.html
 !labor_termination_analyzer/examples/*.pdf
 
