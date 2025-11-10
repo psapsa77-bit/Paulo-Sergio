@@ -1,0 +1,119 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║          LABOR TERMINATION ANALYZER                           ║
+║     Análise de Rescisões Trabalhistas                         ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🚀 COMO USAR - 3 PASSOS SIMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASSO 1: INSTALAR                                            │
+└─────────────────────────────────────────────────────────────┘
+
+   Windows:
+   --------
+   → Duplo clique em: INSTALAR_WINDOWS.bat
+
+   Mac / Linux:
+   -----------
+   → Duplo clique em: instalar.sh
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASSO 2: ABRIR O PROGRAMA                                    │
+└─────────────────────────────────────────────────────────────┘
+
+   Windows:
+   --------
+   → Duplo clique em: ABRIR_PROGRAMA.bat
+
+   Mac / Linux:
+   -----------
+   → Duplo clique em: abrir.sh
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ PASSO 3: USAR                                                │
+└─────────────────────────────────────────────────────────────┘
+
+   Uma janela vai abrir no seu navegador!
+
+   Você pode:
+
+   ✓ Preencher um formulário com os dados da rescisão
+   ✓ OU fazer upload de um arquivo JSON
+
+   Depois:
+
+   ✓ Ver a análise completa com gráficos
+   ✓ Baixar PDF bonito para enviar ao cliente
+   ✓ Baixar HTML ou JSON também
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📚 ARQUIVOS IMPORTANTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMO_USAR.md ............. Guia detalhado passo a passo
+QUICK_START.md ........... Guia rápido para quem tem pressa
+README.md ................ Documentação completa (técnica)
+
+labor_termination_analyzer/examples/
+  ├─ exemplo_completo.json ......... Exemplo: demissão sem justa causa
+  ├─ exemplo_acordo.json ........... Exemplo: demissão por acordo
+  └─ exemplo_pedido_demissao.json .. Exemplo: pedido de demissão
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ❓ PROBLEMAS?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Não tenho Python instalado"
+→ O instalador vai avisar e mostrar onde baixar
+
+"Erro na instalação"
+→ Feche tudo e tente novamente
+→ Leia o arquivo COMO_USAR.md
+
+"O programa não abre"
+→ Verifique se a instalação terminou sem erros
+→ Tente abrir novamente
+
+"Não sei preencher os campos"
+→ Use os valores do documento de rescisão da empresa
+→ Ou baixe um exemplo e edite ele
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✨ O QUE O PROGRAMA FAZ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Calcula automaticamente todos os valores da rescisão
+✓ Explica o que é cada verba (saldo, férias, 13º, FGTS...)
+✓ Mostra gráficos coloridos
+✓ Gera PDF profissional para enviar ao cliente
+✓ Valida se os cálculos estão corretos
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🎯 RESUMO RÁPIDO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Duplo clique em: INSTALAR_WINDOWS.bat (ou instalar.sh)
+2. Aguarde a instalação terminar
+3. Duplo clique em: ABRIR_PROGRAMA.bat (ou abrir.sh)
+4. Preencha os dados na tela que abrir
+5. Clique em "Analisar Rescisão"
+6. Baixe o PDF
+7. Pronto! 🎉
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Desenvolvido com ❤️ por Paulo Sergio
+Versão 1.0.0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

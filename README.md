@@ -2,6 +2,26 @@
 
 Aplicativo completo para ler, analisar e explicar rescisões trabalhistas brasileiras, com geração automática de relatórios visuais em PDF e HTML.
 
+---
+
+## 🎓 **NOVO USUÁRIO? COMECE AQUI!**
+
+> **Nunca usou programação antes?** Não tem problema! Criamos um processo SUPER SIMPLES:
+
+### ⚡ 3 Passos para Usar:
+
+```
+1️⃣ Duplo clique em: INSTALAR_WINDOWS.bat (ou instalar.sh no Mac/Linux)
+2️⃣ Duplo clique em: ABRIR_PROGRAMA.bat (ou abrir.sh)
+3️⃣ Preencha o formulário na tela e baixe o PDF!
+```
+
+📖 **Leia o arquivo:** [COMO_USAR.md](COMO_USAR.md) - Guia passo a passo com prints
+
+📄 **Ou leia:** [LEIA-ME.txt](LEIA-ME.txt) - Instruções rápidas
+
+---
+
 ## 🎯 Funcionalidades
 
 - ✅ **Análise Completa**: Processa todos os componentes de uma rescisão trabalhista
