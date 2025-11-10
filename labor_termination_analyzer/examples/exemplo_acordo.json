@@ -1,0 +1,26 @@
+{
+  "funcionario": {
+    "nome": "João Carlos Oliveira",
+    "cpf": "987.654.321-00",
+    "cargo": "Gerente Comercial",
+    "data_admissao": "2018-03-10",
+    "data_demissao": "2025-11-10",
+    "salario_bruto": "8000.00"
+  },
+  "tipo_rescisao": "acordo",
+  "verbas": {
+    "saldo_salario": "2666.67",
+    "aviso_previo_indenizado": "4333.33",
+    "ferias_vencidas": "0.00",
+    "ferias_proporcionais": "7333.33",
+    "um_terco_ferias": "2444.44",
+    "decimo_terceiro_proporcional": "7333.33",
+    "multa_fgts_40": "15360.00",
+    "saldo_fgts": "76800.00"
+  },
+  "descontos": {
+    "inss": "1388.19",
+    "irrf": "1034.91"
+  },
+  "observacoes": "Rescisão por acordo (comum acordo) conforme Reforma Trabalhista de 2017. O funcionário pode sacar 80% do saldo do FGTS e recebe metade do aviso prévio. NÃO tem direito ao seguro-desemprego."
+}
