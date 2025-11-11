@@ -14,6 +14,8 @@ from pathlib import Path
 from datetime import datetime, date
 from typing import List, Optional
 import logging
+import tempfile
+import os
 
 try:
     from .robot import FGTSRobot
@@ -69,6 +71,8 @@ def main():
         st.session_state.empresas = []
     if 'relatorio' not in st.session_state:
         st.session_state.relatorio = None
+    if 'temp_cert_path' not in st.session_state:
+        st.session_state.temp_cert_path = None
 
     # Sidebar - Configuração
     with st.sidebar:
@@ -80,6 +84,13 @@ def main():
             type=['pfx', 'p12'],
             help="Faça upload do seu certificado digital A1"
         )
+
+        # Feedback do upload
+        if certificado_file is not None:
+            file_size_kb = certificado_file.size / 1024
+            st.success(f"✅ Arquivo carregado: {certificado_file.name} ({file_size_kb:.1f} KB)")
+        else:
+            st.info("ℹ️ Nenhum certificado carregado")
 
         senha_certificado = st.text_input(
             "Senha do Certificado",
@@ -122,47 +133,100 @@ def autenticar(certificado_file, senha: str, headless: bool):
     """Autentica no portal FGTS Digital"""
     with st.spinner("🔄 Autenticando no FGTS Digital..."):
         try:
-            # Salvar certificado temporariamente
-            temp_cert_path = Path("/tmp") / certificado_file.name
-            with open(temp_cert_path, 'wb') as f:
-                f.write(certificado_file.getbuffer())
+            # Validar arquivo
+            if certificado_file is None:
+                st.error("❌ Nenhum arquivo foi enviado")
+                return
 
-            # Criar e autenticar robô
-            robot = FGTSRobot(
-                certificado_path=temp_cert_path,
-                senha_certificado=senha,
-                headless=headless
-            )
+            # Verificar tamanho do arquivo
+            file_size = certificado_file.size
+            if file_size == 0:
+                st.error("❌ O arquivo enviado está vazio")
+                return
 
-            # Validar certificado
-            info_cert = robot.validar_certificado()
+            if file_size > 10 * 1024 * 1024:  # 10MB
+                st.error("❌ Arquivo muito grande (máximo 10MB)")
+                return
 
-            st.sidebar.info(f"""
-            **Certificado:**
-            - Titular: {info_cert['nome_titular']}
-            - CPF/CNPJ: {info_cert['cpf_cnpj']}
-            - Válido até: {info_cert['valido_ate']}
-            - Dias para vencer: {info_cert['dias_para_vencer']}
-            """)
+            # Verificar extensão
+            file_extension = Path(certificado_file.name).suffix.lower()
+            if file_extension not in ['.pfx', '.p12']:
+                st.error(f"❌ Arquivo deve ser .pfx ou .p12 (recebido: {file_extension})")
+                return
 
-            # Autenticar
-            if robot.autenticar():
-                st.session_state.robot = robot
-                st.session_state.autenticado = True
+            logger.info(f"Processando certificado: {certificado_file.name} ({file_size} bytes)")
 
-                # Listar empresas
-                with st.spinner("📋 Carregando empresas..."):
-                    empresas = robot.listar_empresas()
-                    st.session_state.empresas = empresas
+            # Criar diretório temporário seguro
+            temp_dir = tempfile.mkdtemp(prefix="fgts_robot_")
+            temp_cert_path = Path(temp_dir) / certificado_file.name
 
-                st.success(f"✅ Autenticado! {len(empresas)} empresa(s) encontrada(s)")
-                st.rerun()
-            else:
-                st.error("❌ Falha na autenticação")
+            try:
+                # Salvar certificado temporariamente
+                with open(temp_cert_path, 'wb') as f:
+                    f.write(certificado_file.getbuffer())
+
+                logger.info(f"Certificado salvo em: {temp_cert_path}")
+
+                # Verificar se arquivo foi salvo
+                if not temp_cert_path.exists():
+                    st.error("❌ Falha ao salvar certificado temporariamente")
+                    return
+
+                # Criar e autenticar robô
+                robot = FGTSRobot(
+                    certificado_path=temp_cert_path,
+                    senha_certificado=senha,
+                    headless=headless
+                )
+
+                # Validar certificado
+                info_cert = robot.validar_certificado()
+
+                st.sidebar.info(f"""
+                **Certificado:**
+                - Titular: {info_cert['nome_titular']}
+                - CPF/CNPJ: {info_cert['cpf_cnpj']}
+                - Válido até: {info_cert['valido_ate']}
+                - Dias para vencer: {info_cert['dias_para_vencer']}
+                """)
+
+                # Autenticar
+                if robot.autenticar():
+                    st.session_state.robot = robot
+                    st.session_state.autenticado = True
+                    st.session_state.temp_cert_path = temp_cert_path  # Salvar para limpeza depois
+
+                    # Listar empresas
+                    with st.spinner("📋 Carregando empresas..."):
+                        empresas = robot.listar_empresas()
+                        st.session_state.empresas = empresas
+
+                    st.success(f"✅ Autenticado! {len(empresas)} empresa(s) encontrada(s)")
+                    st.rerun()
+                else:
+                    st.error("❌ Falha na autenticação")
+                    # Limpar arquivo temporário em caso de falha
+                    if temp_cert_path.exists():
+                        os.remove(temp_cert_path)
+                        os.rmdir(temp_dir)
+
+            except Exception as e_inner:
+                # Limpar arquivo temporário em caso de erro
+                if temp_cert_path.exists():
+                    try:
+                        os.remove(temp_cert_path)
+                        os.rmdir(temp_dir)
+                    except:
+                        pass
+                raise e_inner
 
         except Exception as e:
-            logger.error(f"Erro na autenticação: {e}")
-            st.error(f"❌ Erro: {str(e)}")
+            logger.error(f"Erro na autenticação: {e}", exc_info=True)
+            st.error(f"❌ Erro ao processar certificado: {str(e)}")
+
+            # Mostrar detalhes do erro em expander para debug
+            with st.expander("🔍 Detalhes do erro (para suporte)"):
+                st.code(f"Tipo: {type(e).__name__}\nMensagem: {str(e)}")
 
 
 def desconectar():
@@ -170,10 +234,25 @@ def desconectar():
     if st.session_state.robot:
         st.session_state.robot.fechar()
 
+    # Limpar arquivo temporário do certificado
+    if 'temp_cert_path' in st.session_state and st.session_state.temp_cert_path:
+        try:
+            temp_path = Path(st.session_state.temp_cert_path)
+            if temp_path.exists():
+                os.remove(temp_path)
+                # Remover diretório temporário também
+                temp_dir = temp_path.parent
+                if temp_dir.exists() and temp_dir.name.startswith("fgts_robot_"):
+                    os.rmdir(temp_dir)
+            logger.info("Arquivo temporário do certificado removido")
+        except Exception as e:
+            logger.warning(f"Não foi possível remover arquivo temporário: {e}")
+
     st.session_state.robot = None
     st.session_state.autenticado = False
     st.session_state.empresas = []
     st.session_state.relatorio = None
+    st.session_state.temp_cert_path = None
     st.rerun()
 
 
