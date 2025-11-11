@@ -131,6 +131,21 @@ def main():
 
 def autenticar(certificado_file, senha: str, headless: bool):
     """Autentica no portal FGTS Digital"""
+
+    # Verificar dependências antes de começar
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        st.error("❌ Playwright não está instalado!")
+        st.warning("""
+        Execute os seguintes comandos no terminal:
+        ```bash
+        pip install playwright
+        playwright install chromium
+        ```
+        """)
+        return
+
     with st.spinner("🔄 Autenticando no FGTS Digital..."):
         try:
             # Validar arquivo
@@ -172,7 +187,8 @@ def autenticar(certificado_file, senha: str, headless: bool):
                     st.error("❌ Falha ao salvar certificado temporariamente")
                     return
 
-                # Criar e autenticar robô
+                # Criar robô
+                logger.info("Criando instância do FGTSRobot...")
                 robot = FGTSRobot(
                     certificado_path=temp_cert_path,
                     senha_certificado=senha,
@@ -180,7 +196,11 @@ def autenticar(certificado_file, senha: str, headless: bool):
                 )
 
                 # Validar certificado
-                info_cert = robot.validar_certificado()
+                logger.info("Validando certificado digital...")
+                with st.spinner("🔍 Validando certificado..."):
+                    info_cert = robot.validar_certificado()
+
+                logger.info(f"Certificado validado: {info_cert.get('nome_titular', 'N/A')}")
 
                 st.sidebar.info(f"""
                 **Certificado:**
@@ -221,12 +241,35 @@ def autenticar(certificado_file, senha: str, headless: bool):
                 raise e_inner
 
         except Exception as e:
+            import traceback
+
             logger.error(f"Erro na autenticação: {e}", exc_info=True)
-            st.error(f"❌ Erro ao processar certificado: {str(e)}")
+
+            # Mensagem mais específica baseada no tipo de erro
+            if isinstance(e, NotImplementedError):
+                st.error("❌ Erro: Funcionalidade não implementada. Isso pode indicar:")
+                st.warning("""
+                - Playwright não está instalado corretamente
+                - Navegador Chromium não foi instalado
+                - Problema de compatibilidade com o sistema operacional
+
+                **Solução:** Execute no terminal:
+                ```
+                pip install playwright
+                playwright install chromium
+                ```
+                """)
+            elif "cryptography" in str(type(e).__module__):
+                st.error("❌ Erro ao processar certificado digital")
+                st.warning("Verifique se o arquivo é um certificado válido .pfx ou .p12")
+            else:
+                st.error(f"❌ Erro ao processar certificado: {str(e) or 'Erro desconhecido'}")
 
             # Mostrar detalhes do erro em expander para debug
-            with st.expander("🔍 Detalhes do erro (para suporte)"):
-                st.code(f"Tipo: {type(e).__name__}\nMensagem: {str(e)}")
+            with st.expander("🔍 Detalhes técnicos (para suporte)"):
+                st.code(f"Tipo: {type(e).__name__}\nMensagem: {str(e) or '(vazio)'}")
+                st.text("Stack trace completo:")
+                st.code(traceback.format_exc())
 
 
 def desconectar():
