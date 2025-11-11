@@ -23,6 +23,35 @@ Aplicativo completo para ler, analisar e explicar rescisões trabalhistas brasil
 
 ---
 
+## 🤖 **NOVO! FGTS Digital Robot**
+
+> **Automatize consultas ao portal FGTS Digital!** Acesse múltiplas empresas via certificado digital e extraia guias pendentes e pagas automaticamente.
+
+### ⚡ Recursos do FGTS Robot:
+
+- 🔐 Login automático com certificado digital A1
+- 🏢 Consulta de múltiplas empresas (via procuração)
+- 📋 Extração de guias pendentes, pagas e vencidas
+- 📊 Dashboard interativo com gráficos
+- 📥 Exportação em Excel e JSON
+- 🤖 Totalmente automatizado
+
+### 🚀 Como usar:
+
+```bash
+# Instalar
+./INSTALAR_FGTS_ROBOT.sh  # Linux/Mac
+# ou
+INSTALAR_FGTS_ROBOT.bat   # Windows
+
+# Executar interface web
+python run_fgts_robot.py
+```
+
+📖 **Documentação completa:** [README_FGTS_ROBOT.md](README_FGTS_ROBOT.md)
+
+---
+
 ## 🎯 Funcionalidades
 
 - 🎉 **NOVO! Extração de PDF**: Extrai dados automaticamente de PDFs de rescisão trabalhista
