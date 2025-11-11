@@ -1,484 +1,580 @@
 """
-Interface Web SIMPLIFICADA para o Labor Termination Analyzer
-Foco em PDF/TXT com formulário editável
+Interface Web com Streamlit para análise de rescisões trabalhistas.
+
+Interface gráfica completa e intuitiva para usuários não-técnicos.
 """
 
 import streamlit as st
-import json
-import tempfile
-from pathlib import Path
 from datetime import date, datetime
 from decimal import Decimal
-import plotly.graph_objects as go
+from pathlib import Path
+import json
+import tempfile
+from typing import Optional, Any
 
-from .models import RescisaoTrabalhista, Funcionario, Verbas, Descontos
+# Imports locais
+from .models import Funcionario, Rescisao
 from .parser import RescisaoParser
+from .pdf_extractor import PDFExtractor
 from .analyzer import RescisaoAnalyzer
 from .generators import HTMLGenerator, PDFGenerator
-from .pdf_extractor import PDFExtractor
 
 
-def formatar_moeda(valor: Decimal) -> str:
-    """Formata valor para moeda brasileira"""
-    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def criar_grafico_verbas(resumo: dict):
-    """Cria gráfico de pizza das verbas"""
-    verbas = resumo['verbas']
-
-    if not verbas:
-        return None
-
-    labels = [v['titulo'] for v in verbas]
-    values = [float(v['valor']) for v in verbas]
-
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        hole=.3,
-        marker_colors=['#2ecc71', '#3498db', '#9b59b6', '#e74c3c', '#f39c12', '#1abc9c', '#34495e', '#16a085']
-    )])
-
-    fig.update_layout(
-        title_text="Composição das Verbas Rescisórias",
-        height=400
-    )
-
-    return fig
-
-
-def criar_grafico_totais(resumo: dict):
-    """Cria gráfico de barras dos totais"""
-    totais = resumo['totais']
-
-    fig = go.Figure(data=[
-        go.Bar(
-            x=['Total Verbas', 'Total Descontos', 'Valor Líquido'],
-            y=[
-                float(totais['total_verbas']),
-                float(totais['total_descontos']),
-                float(totais['valor_liquido'])
-            ],
-            marker_color=['#2ecc71', '#e74c3c', '#3498db']
-        )
-    ])
-
-    fig.update_layout(
-        title_text="Resumo Financeiro",
-        yaxis_title="Valor (R$)",
-        height=400
-    )
-
-    return fig
-
-
-def extrair_texto_arquivo(uploaded_file, usar_ocr=False):
-    """Extrai texto de PDF ou TXT"""
-    file_type = uploaded_file.name.split('.')[-1].lower()
-
-    if file_type == 'txt':
-        # Arquivo TXT - simples
-        return uploaded_file.getvalue().decode('utf-8'), {}
-
-    elif file_type == 'pdf':
-        # Arquivo PDF - usar extrator
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-            tmp.write(uploaded_file.read())
-            tmp_path = tmp.name
-
-        extractor = PDFExtractor()
-        dados_extraidos = extractor.extrair_de_pdf(tmp_path, usar_ocr=usar_ocr)
-        texto_completo = extractor.obter_texto_completo()
-
-        Path(tmp_path).unlink()
-
-        return texto_completo, dados_extraidos
-
-    return "", {}
-
-
-def main():
-    """Função principal da interface web"""
-
+def configurar_pagina():
+    """Configura a página Streamlit."""
     st.set_page_config(
-        page_title="Labor Termination Analyzer",
+        page_title="Analisador de Rescisões Trabalhistas",
         page_icon="📋",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
-    # Cabeçalho
-    st.title("📋 Labor Termination Analyzer")
-    st.markdown("**Análise de rescisões trabalhistas com geração de relatórios**")
+    # CSS customizado
+    st.markdown("""
+        <style>
+        .main-title {
+            font-size: 3em;
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 0.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 2em;
+        }
+        .stButton>button {
+            width: 100%;
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            padding: 0.75em;
+            border-radius: 8px;
+        }
+        .success-box {
+            padding: 1em;
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            border-radius: 4px;
+            margin: 1em 0;
+        }
+        .warning-box {
+            padding: 1em;
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            margin: 1em 0;
+        }
+        .error-box {
+            padding: 1em;
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            border-radius: 4px;
+            margin: 1em 0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+
+def extrair_de_pdf(arquivo_pdf, usar_ocr: bool = False) -> tuple[Optional[dict], list[str]]:
+    """
+    Extrai dados de um PDF.
+
+    Returns:
+        Tupla (dados_extraidos, campos_faltantes)
+    """
+    try:
+        # Salva arquivo temporariamente
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(arquivo_pdf.read())
+            tmp_path = tmp.name
+
+        # Extrai dados
+        extractor = PDFExtractor(usar_ocr=usar_ocr)
+        dados, campos_faltantes = extractor.extrair_e_validar(tmp_path)
+
+        # Remove arquivo temporário
+        Path(tmp_path).unlink()
+
+        return dados, campos_faltantes
+
+    except Exception as e:
+        st.error(f'Erro ao extrair PDF: {e}')
+        return None, []
+
+
+def formulario_funcionario(dados_iniciais: dict = None) -> Optional[Funcionario]:
+    """
+    Exibe formulário para dados do funcionário.
+
+    Args:
+        dados_iniciais: Dados pré-preenchidos (opcional)
+
+    Returns:
+        Objeto Funcionario ou None se inválido
+    """
+    dados = dados_iniciais or {}
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        nome = st.text_input(
+            'Nome Completo *',
+            value=dados.get('nome', ''),
+            help='Nome completo do funcionário'
+        )
+
+        cpf = st.text_input(
+            'CPF *',
+            value=dados.get('cpf', ''),
+            help='CPF no formato XXX.XXX.XXX-XX',
+            placeholder='000.000.000-00'
+        )
+
+    with col2:
+        cargo = st.text_input(
+            'Cargo *',
+            value=dados.get('cargo', ''),
+            help='Cargo ou função exercida'
+        )
+
+        salario_str = st.text_input(
+            'Salário Bruto (R$) *',
+            value=str(dados.get('salario_bruto', '')),
+            help='Salário mensal bruto',
+            placeholder='0000.00'
+        )
+
+    with col3:
+        data_admissao_default = dados.get('data_admissao', date.today())
+        if isinstance(data_admissao_default, str):
+            data_admissao_default = datetime.strptime(data_admissao_default, '%Y-%m-%d').date()
+
+        data_admissao = st.date_input(
+            'Data de Admissão *',
+            value=data_admissao_default,
+            help='Data de entrada na empresa'
+        )
+
+        data_demissao_default = dados.get('data_demissao', date.today())
+        if isinstance(data_demissao_default, str):
+            data_demissao_default = datetime.strptime(data_demissao_default, '%Y-%m-%d').date()
+
+        data_demissao = st.date_input(
+            'Data de Demissão *',
+            value=data_demissao_default,
+            help='Data de saída da empresa'
+        )
+
+    # Validação básica
+    if not all([nome, cpf, cargo, salario_str]):
+        return None
+
+    try:
+        salario = Decimal(salario_str.replace(',', '.'))
+        funcionario = Funcionario(
+            nome=nome,
+            cpf=cpf,
+            cargo=cargo,
+            data_admissao=data_admissao,
+            data_demissao=data_demissao,
+            salario_bruto=salario
+        )
+        return funcionario
+    except Exception as e:
+        st.error(f'Erro nos dados do funcionário: {e}')
+        return None
+
+
+def formulario_verbas_descontos(dados_iniciais: dict = None) -> tuple[dict[str, Decimal], dict[str, Decimal]]:
+    """
+    Exibe formulários para verbas e descontos.
+
+    Returns:
+        Tupla (verbas, descontos)
+    """
+    dados = dados_iniciais or {'verbas': {}, 'descontos': {}}
+
+    # Verbas
+    st.subheader('💰 Verbas Rescisórias (Valores a Receber)')
+
+    verbas_padrao = [
+        'Saldo de Salário',
+        'Aviso Prévio Indenizado',
+        'Férias Vencidas + 1/3',
+        'Férias Proporcionais + 1/3',
+        '13º Salário Proporcional',
+        'Multa 40% FGTS',
+    ]
+
+    verbas = {}
+    cols_verbas = st.columns(3)
+
+    for i, verba_nome in enumerate(verbas_padrao):
+        with cols_verbas[i % 3]:
+            valor_inicial = dados.get('verbas', {}).get(verba_nome, '')
+            valor_str = st.text_input(
+                f'{verba_nome} (R$)',
+                value=str(valor_inicial) if valor_inicial else '',
+                key=f'verba_{i}',
+                placeholder='0.00'
+            )
+            if valor_str:
+                try:
+                    verbas[verba_nome] = Decimal(valor_str.replace(',', '.'))
+                except:
+                    pass
+
+    # Verbas adicionais
+    with st.expander('➕ Adicionar Outras Verbas'):
+        num_verbas_extras = st.number_input('Número de verbas adicionais', min_value=0, max_value=10, value=0)
+        for i in range(num_verbas_extras):
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                nome_extra = st.text_input(f'Nome da verba {i+1}', key=f'verba_extra_nome_{i}')
+            with col2:
+                valor_extra = st.text_input(f'Valor (R$) {i+1}', key=f'verba_extra_valor_{i}', placeholder='0.00')
+
+            if nome_extra and valor_extra:
+                try:
+                    verbas[nome_extra] = Decimal(valor_extra.replace(',', '.'))
+                except:
+                    pass
+
     st.divider()
 
-    # Sidebar para opções
-    with st.sidebar:
-        st.header("⚙️ Modo de Entrada")
-        modo = st.radio(
-            "Escolha como inserir dados:",
-            ["📄 Upload de Arquivo (PDF/TXT)", "✍️ Formulário em Branco"],
-            help="Upload extrai dados automaticamente e permite edição"
+    # Descontos
+    st.subheader('➖ Descontos')
+
+    descontos_padrao = [
+        'INSS',
+        'IRRF',
+        'Aviso Prévio Descontado',
+    ]
+
+    descontos = {}
+    cols_descontos = st.columns(3)
+
+    for i, desconto_nome in enumerate(descontos_padrao):
+        with cols_descontos[i % 3]:
+            valor_inicial = dados.get('descontos', {}).get(desconto_nome, '')
+            valor_str = st.text_input(
+                f'{desconto_nome} (R$)',
+                value=str(valor_inicial) if valor_inicial else '',
+                key=f'desconto_{i}',
+                placeholder='0.00'
+            )
+            if valor_str:
+                try:
+                    descontos[desconto_nome] = Decimal(valor_str.replace(',', '.'))
+                except:
+                    pass
+
+    # Descontos adicionais
+    with st.expander('➕ Adicionar Outros Descontos'):
+        num_descontos_extras = st.number_input('Número de descontos adicionais', min_value=0, max_value=10, value=0)
+        for i in range(num_descontos_extras):
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                nome_extra = st.text_input(f'Nome do desconto {i+1}', key=f'desconto_extra_nome_{i}')
+            with col2:
+                valor_extra = st.text_input(f'Valor (R$) {i+1}', key=f'desconto_extra_valor_{i}', placeholder='0.00')
+
+            if nome_extra and valor_extra:
+                try:
+                    descontos[nome_extra] = Decimal(valor_extra.replace(',', '.'))
+                except:
+                    pass
+
+    return verbas, descontos
+
+
+def exibir_analise(rescisao: Rescisao):
+    """Exibe análise completa da rescisão."""
+    analyzer = RescisaoAnalyzer(rescisao)
+    resumo = analyzer.gerar_resumo_completo()
+
+    # Totais em destaque
+    st.markdown('### 💰 Resumo Financeiro')
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            label='Total de Verbas',
+            value=f"R$ {resumo['totais']['verbas']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.'),
+            delta=None,
+            delta_color='normal'
         )
 
-    rescisao = None
-
-    # ============================================================================
-    # MODO 1: UPLOAD DE ARQUIVO (PDF/TXT) COM FORMULÁRIO PRÉ-PREENCHIDO
-    # ============================================================================
-    if modo == "📄 Upload de Arquivo (PDF/TXT)":
-        st.header("📄 Upload de Arquivo de Rescisão")
-
-        st.info(
-            "💡 **Como funciona:**\n\n"
-            "1. Faça upload do PDF ou TXT da rescisão\n"
-            "2. O sistema extrai o texto e tenta identificar os dados\n"
-            "3. Um formulário aparece PRÉ-PREENCHIDO\n"
-            "4. Você EDITA o que estiver errado\n"
-            "5. Clica em Analisar!"
+    with col2:
+        st.metric(
+            label='Total de Descontos',
+            value=f"R$ {resumo['totais']['descontos']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.'),
+            delta=None,
+            delta_color='inverse'
         )
 
-        col1, col2 = st.columns([3, 1])
+    with col3:
+        st.metric(
+            label='VALOR LÍQUIDO',
+            value=f"R$ {resumo['totais']['liquido']:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.'),
+            delta=None,
+            delta_color='normal'
+        )
+
+    st.divider()
+
+    # Gráficos
+    try:
+        import plotly.graph_objects as go
+        import plotly.express as px
+
+        col1, col2 = st.columns(2)
 
         with col1:
-            uploaded_file = st.file_uploader(
-                "Escolha o arquivo (PDF ou TXT)",
-                type=['pdf', 'txt'],
-                help="PDF com texto ou arquivo TXT simples"
-            )
+            # Gráfico de pizza - Verbas
+            if resumo['verbas']:
+                st.markdown('#### Distribuição de Verbas')
+                labels_verbas = [v['nome'] for v in resumo['verbas']]
+                values_verbas = [float(v['valor']) for v in resumo['verbas']]
+
+                fig_verbas = go.Figure(data=[go.Pie(
+                    labels=labels_verbas,
+                    values=values_verbas,
+                    hole=.3,
+                    marker=dict(colors=px.colors.sequential.Greens_r)
+                )])
+                fig_verbas.update_layout(height=400)
+                st.plotly_chart(fig_verbas, use_container_width=True)
 
         with col2:
+            # Gráfico de barras - Comparativo
+            st.markdown('#### Comparativo Verbas vs Descontos')
+            categorias = []
+            valores = []
+
+            for verba in resumo['verbas']:
+                categorias.append(verba['nome'])
+                valores.append(float(verba['valor']))
+
+            for desconto in resumo['descontos']:
+                categorias.append(f"{desconto['nome']} (Desconto)")
+                valores.append(-float(desconto['valor']))
+
+            fig_comparativo = go.Figure(data=[
+                go.Bar(
+                    x=categorias,
+                    y=valores,
+                    marker_color=['green' if v > 0 else 'red' for v in valores]
+                )
+            ])
+            fig_comparativo.update_layout(
+                height=400,
+                xaxis_tickangle=-45,
+                showlegend=False,
+                yaxis_title='Valor (R$)'
+            )
+            st.plotly_chart(fig_comparativo, use_container_width=True)
+
+    except ImportError:
+        st.warning('Plotly não disponível para gráficos interativos.')
+
+    st.divider()
+
+    # Tipo de rescisão e direitos
+    st.markdown('### 📋 Tipo de Rescisão e Direitos')
+
+    direitos = resumo['direitos_tipo_rescisao']
+
+    st.info(f"**{direitos['nome']}**: {direitos['descricao']}")
+
+    if direitos.get('direitos'):
+        with st.expander('✅ Direitos neste tipo de rescisão', expanded=True):
+            for direito in direitos['direitos']:
+                st.write(f"- {direito}")
+
+    if direitos.get('perdas'):
+        with st.expander('⚠️ Perdas neste tipo de rescisão'):
+            for perda in direitos['perdas']:
+                st.write(f"- {perda}")
+
+    if direitos.get('observacoes'):
+        with st.expander('📌 Observações importantes'):
+            for obs in direitos['observacoes']:
+                st.write(f"- {obs}")
+
+    st.divider()
+
+    # Verbas detalhadas
+    st.markdown('### 💵 Verbas Detalhadas com Explicações')
+
+    for verba in resumo['verbas']:
+        with st.expander(f"{verba['nome']} - R$ {float(verba['valor']):,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')):
+            expl = verba['explicacao']
+
+            st.markdown(f"**💡 O que é?**")
+            st.write(expl['o_que_e'])
+
+            st.markdown(f"**📚 Base Legal**")
+            st.write(expl['base_legal'])
+
+            st.markdown(f"**🧮 Como é calculado**")
+            st.code(expl['calculo'])
+
+            st.markdown(f"**📋 Quando se aplica**")
+            st.write(expl['quando_aplica'])
+
+    # Descontos detalhados
+    if resumo['descontos']:
+        st.markdown('### ➖ Descontos Detalhados com Explicações')
+
+        for desconto in resumo['descontos']:
+            with st.expander(f"{desconto['nome']} - R$ {float(desconto['valor']):,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')):
+                expl = desconto['explicacao']
+
+                st.markdown(f"**💡 O que é?**")
+                st.write(expl['o_que_e'])
+
+                st.markdown(f"**📚 Base Legal**")
+                st.write(expl['base_legal'])
+
+                st.markdown(f"**🧮 Como é calculado**")
+                st.code(expl['calculo'])
+
+                st.markdown(f"**📋 Quando se aplica**")
+                st.write(expl['quando_aplica'])
+
+    # Alertas
+    if resumo['alertas']:
+        st.markdown('### ⚠️ Verificações e Alertas')
+
+        for alerta in resumo['alertas']:
+            tipo_icon = {'info': 'ℹ️', 'warning': '⚠️', 'error': '❌'}
+            icon = tipo_icon.get(alerta['tipo'], 'ℹ️')
+
+            if alerta['tipo'] == 'error':
+                st.error(f"{icon} **{alerta['campo']}**: {alerta['mensagem']}")
+            elif alerta['tipo'] == 'warning':
+                st.warning(f"{icon} **{alerta['campo']}**: {alerta['mensagem']}")
+            else:
+                st.info(f"{icon} **{alerta['campo']}**: {alerta['mensagem']}")
+
+    # Observações
+    if resumo['observacoes']:
+        st.markdown('### 📝 Observações')
+        st.info(resumo['observacoes'])
+
+
+def main():
+    """Função principal da aplicação Streamlit."""
+    configurar_pagina()
+
+    # Cabeçalho
+    st.markdown('<h1 class="main-title">📋 Analisador de Rescisões Trabalhistas</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Análise completa com explicações detalhadas e base legal</p>', unsafe_allow_html=True)
+
+    # Sidebar
+    with st.sidebar:
+        st.header('⚙️ Opções')
+
+        modo = st.radio(
+            'Como deseja iniciar?',
+            ['📄 Upload de Arquivo (PDF/JSON)', '✍️ Formulário Manual'],
+            help='Escolha se quer importar dados ou preencher manualmente'
+        )
+
+        st.divider()
+
+        # Tipo de rescisão
+        tipo_rescisao = st.selectbox(
+            'Tipo de Rescisão *',
+            ['sem justa causa', 'com justa causa', 'pedido de demissao', 'acordo'],
+            help='Selecione o tipo de rescisão contratual'
+        )
+
+        observacoes = st.text_area(
+            'Observações',
+            help='Observações adicionais sobre a rescisão',
+            placeholder='Digite observações adicionais...'
+        )
+
+        st.divider()
+        st.caption('Labor Termination Analyzer v2.0')
+
+    # Área principal
+    dados_extraidos = None
+
+    if modo == '📄 Upload de Arquivo (PDF/JSON)':
+        st.header('📤 Upload de Arquivo')
+
+        tipo_arquivo = st.radio('Tipo de arquivo:', ['PDF', 'JSON'], horizontal=True)
+
+        if tipo_arquivo == 'PDF':
             usar_ocr = st.checkbox(
-                "PDF Escaneado?",
-                value=False,
-                help="Marque apenas se o PDF for imagem escaneada"
+                'Usar OCR (para PDFs escaneados)',
+                help='Ativa reconhecimento óptico de caracteres para PDFs escaneados'
             )
 
-        if uploaded_file is not None:
-            try:
-                with st.spinner("📖 Extraindo texto do arquivo..."):
-                    texto_completo, dados_extraidos = extrair_texto_arquivo(uploaded_file, usar_ocr)
-
-                # Mostrar texto extraído para referência
-                with st.expander("📄 Ver texto completo extraído do arquivo", expanded=False):
-                    st.text_area(
-                        "Texto do arquivo (use como referência para preencher o formulário)",
-                        texto_completo,
-                        height=300
-                    )
-
-                # FORMULÁRIO PRÉ-PREENCHIDO
-                st.success("✅ Arquivo carregado! Revise e corrija os dados abaixo:")
-
-                # Pegar dados extraídos ou valores padrão
-                func_data = dados_extraidos.get('funcionario', {}) if dados_extraidos else {}
-                verbas_data = dados_extraidos.get('verbas', {}) if dados_extraidos else {}
-                descontos_data = dados_extraidos.get('descontos', {}) if dados_extraidos else {}
-                tipo_resc = dados_extraidos.get('tipo_rescisao', 'sem justa causa') if dados_extraidos else 'sem justa causa'
-
-                with st.form("formulario_pdf"):
-                    st.subheader("👤 Dados do Funcionário")
-
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        nome = st.text_input(
-                            "Nome Completo*",
-                            value=func_data.get('nome', ''),
-                            help="Corrija se necessário"
-                        )
-                        cpf = st.text_input(
-                            "CPF*",
-                            value=func_data.get('cpf', ''),
-                            help="Formato: 000.000.000-00"
-                        )
-
-                    with col2:
-                        cargo = st.text_input(
-                            "Cargo*",
-                            value=func_data.get('cargo', ''),
-                            help="Ex: Analista, Gerente"
-                        )
-                        salario = st.number_input(
-                            "Salário Bruto (R$)*",
-                            min_value=0.0,
-                            value=float(func_data.get('salario_bruto', '0').replace(',', '.')) if func_data.get('salario_bruto') else 0.0,
-                            step=100.0
-                        )
-
-                    with col3:
-                        # Parse de datas
-                        data_adm_str = func_data.get('data_admissao', '01/01/2020')
-                        data_dem_str = func_data.get('data_demissao', date.today().strftime('%d/%m/%Y'))
-
-                        try:
-                            data_adm = datetime.strptime(data_adm_str, '%d/%m/%Y').date()
-                        except:
-                            data_adm = date(2020, 1, 1)
-
-                        try:
-                            data_dem = datetime.strptime(data_dem_str, '%d/%m/%Y').date()
-                        except:
-                            data_dem = date.today()
-
-                        data_admissao = st.date_input("Data de Admissão*", value=data_adm)
-                        data_demissao = st.date_input("Data de Demissão*", value=data_dem)
-
-                    st.divider()
-                    st.subheader("📑 Tipo de Rescisão")
-
-                    tipo_rescisao = st.selectbox(
-                        "Selecione o tipo*",
-                        ["sem justa causa", "com justa causa", "pedido de demissao", "acordo"],
-                        index=["sem justa causa", "com justa causa", "pedido de demissao", "acordo"].index(tipo_resc) if tipo_resc in ["sem justa causa", "com justa causa", "pedido de demissao", "acordo"] else 0
-                    )
-
-                    st.divider()
-                    st.subheader("💰 Verbas Rescisórias")
-
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        saldo_salario = st.number_input(
-                            "Saldo de Salário (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('saldo_salario', '0').replace(',', '.')) if verbas_data.get('saldo_salario') else 0.0,
-                            step=10.0
-                        )
-                        aviso_previo = st.number_input(
-                            "Aviso Prévio Indenizado (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('aviso_previo_indenizado', '0').replace(',', '.')) if verbas_data.get('aviso_previo_indenizado') else 0.0,
-                            step=100.0
-                        )
-                        ferias_vencidas = st.number_input(
-                            "Férias Vencidas (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('ferias_vencidas', '0').replace(',', '.')) if verbas_data.get('ferias_vencidas') else 0.0,
-                            step=100.0
-                        )
-
-                    with col2:
-                        ferias_proporcionais = st.number_input(
-                            "Férias Proporcionais (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('ferias_proporcionais', '0').replace(',', '.')) if verbas_data.get('ferias_proporcionais') else 0.0,
-                            step=10.0
-                        )
-                        um_terco = st.number_input(
-                            "1/3 sobre Férias (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('um_terco_ferias', '0').replace(',', '.')) if verbas_data.get('um_terco_ferias') else 0.0,
-                            step=10.0
-                        )
-                        decimo_terceiro = st.number_input(
-                            "13º Proporcional (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('decimo_terceiro_proporcional', '0').replace(',', '.')) if verbas_data.get('decimo_terceiro_proporcional') else 0.0,
-                            step=10.0
-                        )
-
-                    with col3:
-                        multa_fgts = st.number_input(
-                            "Multa 40% FGTS (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('multa_fgts_40', '0').replace(',', '.')) if verbas_data.get('multa_fgts_40') else 0.0,
-                            step=100.0
-                        )
-                        saldo_fgts = st.number_input(
-                            "Saldo FGTS (R$)",
-                            min_value=0.0,
-                            value=float(verbas_data.get('saldo_fgts', '0').replace(',', '.')) if verbas_data.get('saldo_fgts') else 0.0,
-                            step=100.0
-                        )
-
-                    st.divider()
-                    st.subheader("➖ Descontos")
-
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        inss = st.number_input(
-                            "INSS (R$)",
-                            min_value=0.0,
-                            value=float(descontos_data.get('inss', '0').replace(',', '.')) if descontos_data.get('inss') else 0.0,
-                            step=10.0
-                        )
-
-                    with col2:
-                        irrf = st.number_input(
-                            "IRRF (R$)",
-                            min_value=0.0,
-                            value=float(descontos_data.get('irrf', '0').replace(',', '.')) if descontos_data.get('irrf') else 0.0,
-                            step=10.0
-                        )
-
-                    with col3:
-                        desc_aviso_previo = st.number_input(
-                            "Desconto Aviso Prévio (R$)",
-                            min_value=0.0,
-                            value=float(descontos_data.get('aviso_previo_indenizado', '0').replace(',', '.')) if descontos_data.get('aviso_previo_indenizado') else 0.0,
-                            step=10.0
-                        )
-
-                    st.divider()
-                    observacoes = st.text_area(
-                        "Observações",
-                        value="Dados extraídos de arquivo e revisados.",
-                        help="Observações adicionais"
-                    )
-
-                    submitted = st.form_submit_button(
-                        "🔍 Analisar Rescisão",
-                        type="primary",
-                        use_container_width=True
-                    )
-
-                    if submitted:
-                        try:
-                            # Criar objeto Rescisao
-                            funcionario = Funcionario(
-                                nome=nome,
-                                cpf=cpf,
-                                cargo=cargo,
-                                data_admissao=data_admissao,
-                                data_demissao=data_demissao,
-                                salario_bruto=Decimal(str(salario))
-                            )
-
-                            verbas = Verbas(
-                                saldo_salario=Decimal(str(saldo_salario)),
-                                aviso_previo_indenizado=Decimal(str(aviso_previo)),
-                                ferias_vencidas=Decimal(str(ferias_vencidas)),
-                                ferias_proporcionais=Decimal(str(ferias_proporcionais)),
-                                um_terco_ferias=Decimal(str(um_terco)),
-                                decimo_terceiro_proporcional=Decimal(str(decimo_terceiro)),
-                                multa_fgts_40=Decimal(str(multa_fgts)),
-                                saldo_fgts=Decimal(str(saldo_fgts))
-                            )
-
-                            descontos = Descontos(
-                                inss=Decimal(str(inss)),
-                                irrf=Decimal(str(irrf)),
-                                aviso_previo_indenizado=Decimal(str(desc_aviso_previo))
-                            )
-
-                            rescisao = RescisaoTrabalhista(
-                                funcionario=funcionario,
-                                tipo_rescisao=tipo_rescisao,
-                                verbas=verbas,
-                                descontos=descontos,
-                                observacoes=observacoes if observacoes else None
-                            )
-
-                            st.success("✅ Dados validados com sucesso!")
-
-                        except Exception as e:
-                            st.error(f"❌ Erro ao processar dados: {str(e)}")
-
-            except Exception as e:
-                st.error(f"❌ Erro ao ler arquivo: {str(e)}")
-                st.info("💡 Tente outro arquivo ou use o Formulário em Branco")
-
-    # ============================================================================
-    # MODO 2: FORMULÁRIO EM BRANCO
-    # ============================================================================
-    else:
-        st.header("✍️ Formulário em Branco")
-
-        with st.form("formulario_manual"):
-            st.subheader("👤 Dados do Funcionário")
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                nome = st.text_input("Nome Completo*", value="")
-                cpf = st.text_input("CPF*", value="")
-
-            with col2:
-                cargo = st.text_input("Cargo*", value="")
-                salario = st.number_input("Salário Bruto (R$)*", min_value=0.0, value=0.0, step=100.0)
-
-            with col3:
-                data_admissao = st.date_input("Data de Admissão*", value=date(2020, 1, 1))
-                data_demissao = st.date_input("Data de Demissão*", value=date.today())
-
-            st.divider()
-            st.subheader("📑 Tipo de Rescisão")
-
-            tipo_rescisao = st.selectbox(
-                "Selecione o tipo*",
-                ["sem justa causa", "com justa causa", "pedido de demissao", "acordo"]
+            arquivo_pdf = st.file_uploader(
+                'Selecione o arquivo PDF',
+                type=['pdf'],
+                help='Faça upload do PDF da rescisão trabalhista'
             )
 
-            st.divider()
-            st.subheader("💰 Verbas Rescisórias")
+            if arquivo_pdf:
+                with st.spinner('Extraindo dados do PDF...'):
+                    dados, campos_faltantes = extrair_de_pdf(arquivo_pdf, usar_ocr)
 
-            col1, col2, col3 = st.columns(3)
+                    if dados:
+                        st.success('✅ Dados extraídos com sucesso!')
 
-            with col1:
-                saldo_salario = st.number_input("Saldo de Salário (R$)", min_value=0.0, value=0.0, step=10.0)
-                aviso_previo = st.number_input("Aviso Prévio Indenizado (R$)", min_value=0.0, value=0.0, step=100.0)
-                ferias_vencidas = st.number_input("Férias Vencidas (R$)", min_value=0.0, value=0.0, step=100.0)
+                        if campos_faltantes:
+                            st.warning(f'⚠️ Alguns campos não foram encontrados: {", ".join(campos_faltantes)}')
+                            st.info('💡 Revise e complete os campos abaixo conforme necessário.')
 
-            with col2:
-                ferias_proporcionais = st.number_input("Férias Proporcionais (R$)", min_value=0.0, value=0.0, step=10.0)
-                um_terco = st.number_input("1/3 sobre Férias (R$)", min_value=0.0, value=0.0, step=10.0)
-                decimo_terceiro = st.number_input("13º Proporcional (R$)", min_value=0.0, value=0.0, step=10.0)
+                        dados_extraidos = dados
+                    else:
+                        st.error('❌ Não foi possível extrair dados do PDF.')
 
-            with col3:
-                multa_fgts = st.number_input("Multa 40% FGTS (R$)", min_value=0.0, value=0.0, step=100.0)
-                saldo_fgts = st.number_input("Saldo FGTS (R$)", min_value=0.0, value=0.0, step=100.0)
+        else:  # JSON
+            arquivo_json = st.file_uploader(
+                'Selecione o arquivo JSON',
+                type=['json'],
+                help='Faça upload do arquivo JSON com dados da rescisão'
+            )
 
-            st.divider()
-            st.subheader("➖ Descontos")
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                inss = st.number_input("INSS (R$)", min_value=0.0, value=0.0, step=10.0)
-
-            with col2:
-                irrf = st.number_input("IRRF (R$)", min_value=0.0, value=0.0, step=10.0)
-
-            with col3:
-                desc_aviso_previo = st.number_input("Desconto Aviso Prévio (R$)", min_value=0.0, value=0.0, step=10.0)
-
-            st.divider()
-            observacoes = st.text_area("Observações", value="")
-
-            submitted = st.form_submit_button("🔍 Analisar Rescisão", type="primary", use_container_width=True)
-
-            if submitted:
+            if arquivo_json:
                 try:
-                    funcionario = Funcionario(
-                        nome=nome,
-                        cpf=cpf,
-                        cargo=cargo,
-                        data_admissao=data_admissao,
-                        data_demissao=data_demissao,
-                        salario_bruto=Decimal(str(salario))
-                    )
+                    conteudo = arquivo_json.read().decode('utf-8')
+                    dados = json.loads(conteudo)
+                    st.success('✅ JSON carregado com sucesso!')
+                    dados_extraidos = dados
+                except Exception as e:
+                    st.error(f'❌ Erro ao ler JSON: {e}')
 
-                    verbas = Verbas(
-                        saldo_salario=Decimal(str(saldo_salario)),
-                        aviso_previo_indenizado=Decimal(str(aviso_previo)),
-                        ferias_vencidas=Decimal(str(ferias_vencidas)),
-                        ferias_proporcionais=Decimal(str(ferias_proporcionais)),
-                        um_terco_ferias=Decimal(str(um_terco)),
-                        decimo_terceiro_proporcional=Decimal(str(decimo_terceiro)),
-                        multa_fgts_40=Decimal(str(multa_fgts)),
-                        saldo_fgts=Decimal(str(saldo_fgts))
-                    )
+    # Formulário
+    st.header('📝 Dados da Rescisão')
 
-                    descontos = Descontos(
-                        inss=Decimal(str(inss)),
-                        irrf=Decimal(str(irrf)),
-                        aviso_previo_indenizado=Decimal(str(desc_aviso_previo))
-                    )
+    with st.form('formulario_rescisao'):
+        st.subheader('👤 Dados do Funcionário')
 
-                    rescisao = RescisaoTrabalhista(
+        funcionario_data = dados_extraidos.get('funcionario', {}) if dados_extraidos else {}
+        funcionario = formulario_funcionario(funcionario_data)
+
+        st.divider()
+
+        verbas_descontos_data = dados_extraidos if dados_extraidos else {}
+        verbas, descontos = formulario_verbas_descontos(verbas_descontos_data)
+
+        # Botão de análise
+        submitted = st.form_submit_button('🔍 Analisar Rescisão', use_container_width=True)
+
+        if submitted:
+            if funcionario and (verbas or descontos):
+                try:
+                    # Cria objeto Rescisao
+                    rescisao = Rescisao(
                         funcionario=funcionario,
                         tipo_rescisao=tipo_rescisao,
                         verbas=verbas,
@@ -486,200 +582,80 @@ def main():
                         observacoes=observacoes if observacoes else None
                     )
 
-                    st.success("✅ Dados validados com sucesso!")
+                    # Salva no session state
+                    st.session_state['rescisao'] = rescisao
+                    st.session_state['analise_realizada'] = True
+
+                    st.success('✅ Rescisão analisada com sucesso!')
 
                 except Exception as e:
-                    st.error(f"❌ Erro ao processar dados: {str(e)}")
+                    st.error(f'❌ Erro ao criar rescisão: {e}')
+            else:
+                st.error('❌ Por favor, preencha todos os campos obrigatórios.')
 
-    # ============================================================================
-    # EXIBIR ANÁLISE
-    # ============================================================================
-    if rescisao is not None:
+    # Exibe análise se disponível
+    if st.session_state.get('analise_realizada') and 'rescisao' in st.session_state:
         st.divider()
-        st.header("📊 Análise da Rescisão")
+        st.header('📊 Análise Completa')
 
-        # Criar análise
-        analyzer = RescisaoAnalyzer(rescisao)
-        resumo = analyzer.gerar_resumo_completo()
+        rescisao = st.session_state['rescisao']
 
-        # Informações do Funcionário
-        with st.expander("👤 Informações do Funcionário", expanded=True):
-            func = resumo['funcionario']
+        # Exibe análise
+        exibir_analise(rescisao)
 
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-                st.metric("Nome", func['nome'])
-                st.metric("CPF", func['cpf'])
-
-            with col2:
-                st.metric("Cargo", func['cargo'])
-                st.metric("Salário Bruto", func['salario_bruto'])
-
-            with col3:
-                st.metric("Admissão", func['data_admissao'])
-                st.metric("Demissão", func['data_demissao'])
-
-            with col4:
-                st.metric("Tempo de Serviço", func['tempo_servico'])
-
-        # Tipo de Rescisão
-        tipo = resumo['tipo_rescisao']
-        st.info(f"**📑 {tipo['nome']}**\n\n{tipo['descricao']}")
-
-        if tipo.get('direitos'):
-            with st.expander("✅ Direitos do Trabalhador neste Tipo de Rescisão"):
-                for direito in tipo['direitos']:
-                    st.markdown(f"- {direito}")
-
-        # Verbas
-        st.subheader("💰 Verbas Rescisórias")
-
-        if resumo['verbas']:
-            # Gráfico de verbas
-            fig_verbas = criar_grafico_verbas(resumo)
-            if fig_verbas:
-                st.plotly_chart(fig_verbas, use_container_width=True)
-
-            # Detalhes das verbas
-            for verba in resumo['verbas']:
-                with st.expander(f"**{verba['titulo']}** - {verba['valor_formatado']}", expanded=False):
-                    st.markdown(f"**Descrição:** {verba['descricao']}")
-                    st.info(f"**Cálculo:** {verba['calculo']}")
-
-        # Descontos
-        if resumo['descontos']:
-            st.subheader("➖ Descontos")
-
-            for desconto in resumo['descontos']:
-                with st.expander(f"**{desconto['titulo']}** - {desconto['valor_formatado']}", expanded=False):
-                    st.markdown(f"**Descrição:** {desconto['descricao']}")
-                    st.info(f"**Cálculo:** {desconto['calculo']}")
-
-        # Totais
+        # Downloads
         st.divider()
-        st.subheader("💵 Resumo Financeiro")
-
-        totais = resumo['totais']
+        st.header('💾 Downloads')
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("Total de Verbas", totais['total_verbas_formatado'])
-
-        with col2:
-            st.metric("Total de Descontos", totais['total_descontos_formatado'])
-
-        with col3:
-            st.metric("💰 Valor Líquido a Receber", totais['valor_liquido_formatado'])
-
-        # Gráfico de totais
-        fig_totais = criar_grafico_totais(resumo)
-        st.plotly_chart(fig_totais, use_container_width=True)
-
-        # Observações
-        if resumo['observacoes']:
-            st.warning(f"**⚠️ Observações**\n\n{resumo['observacoes']}")
-
-        # Botões de Download
-        st.divider()
-        st.subheader("📥 Gerar Relatórios")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            # Gerar HTML
+            # Download HTML
             try:
                 html_gen = HTMLGenerator()
+                html_content = html_gen.gerar(rescisao)
 
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as tmp:
-                    html_path = html_gen.gerar(rescisao, tmp.name)
-
-                    with open(html_path, 'r', encoding='utf-8') as f:
-                        html_content = f.read()
-
-                    st.download_button(
-                        label="📄 Baixar Relatório HTML",
-                        data=html_content,
-                        file_name=f"rescisao_{resumo['funcionario']['nome'].replace(' ', '_')}.html",
-                        mime="text/html",
-                        use_container_width=True
-                    )
-
-                    Path(html_path).unlink()
-            except Exception as e:
-                st.error(f"Erro ao gerar HTML: {str(e)}")
-
-        with col2:
-            # Gerar PDF
-            try:
-                pdf_gen = PDFGenerator()
-
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-                    pdf_path = pdf_gen.gerar(rescisao, tmp.name)
-
-                    with open(pdf_path, 'rb') as f:
-                        pdf_content = f.read()
-
-                    st.download_button(
-                        label="📑 Baixar Relatório PDF",
-                        data=pdf_content,
-                        file_name=f"rescisao_{resumo['funcionario']['nome'].replace(' ', '_')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-
-                    Path(pdf_path).unlink()
-            except RuntimeError as e:
-                # Erro específico de WeasyPrint não disponível
-                st.warning("⚠️ **PDF não disponível no Windows**")
-                st.info(
-                    "💡 **SOLUÇÃO RÁPIDA:**\n\n"
-                    "1. Baixe o relatório **HTML** (botão ao lado)\n"
-                    "2. Abra o HTML no navegador\n"
-                    "3. Pressione **Ctrl+P**\n"
-                    "4. Escolha **'Salvar como PDF'**"
+                st.download_button(
+                    label='📄 Baixar Relatório HTML',
+                    data=html_content,
+                    file_name='rescisao_analise.html',
+                    mime='text/html',
+                    use_container_width=True
                 )
             except Exception as e:
-                st.error(f"Erro ao gerar PDF: {str(e)}")
+                st.error(f'Erro ao gerar HTML: {e}')
+
+        with col2:
+            # Download PDF
+            if PDFGenerator.esta_disponivel():
+                try:
+                    pdf_gen = PDFGenerator()
+                    pdf_bytes = pdf_gen.gerar(rescisao)
+
+                    st.download_button(
+                        label='📑 Baixar Relatório PDF',
+                        data=pdf_bytes,
+                        file_name='rescisao_analise.pdf',
+                        mime='application/pdf',
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f'Erro ao gerar PDF: {e}')
+            else:
+                st.warning(PDFGenerator.obter_mensagem_erro())
 
         with col3:
-            # Exportar JSON
-            json_data = {
-                "funcionario": {
-                    "nome": rescisao.funcionario.nome,
-                    "cpf": rescisao.funcionario.cpf,
-                    "cargo": rescisao.funcionario.cargo,
-                    "data_admissao": rescisao.funcionario.data_admissao.isoformat(),
-                    "data_demissao": rescisao.funcionario.data_demissao.isoformat(),
-                    "salario_bruto": str(rescisao.funcionario.salario_bruto)
-                },
-                "tipo_rescisao": rescisao.tipo_rescisao,
-                "verbas": {k: str(v) for k, v in rescisao.verbas.model_dump().items() if k != "outras_verbas"},
-                "descontos": {k: str(v) for k, v in rescisao.descontos.model_dump().items() if k != "outros_descontos"},
-                "observacoes": rescisao.observacoes
-            }
+            # Download JSON
+            json_str = RescisaoParser.para_json(rescisao, indent=2)
 
             st.download_button(
-                label="💾 Exportar JSON",
-                data=json.dumps(json_data, indent=2, ensure_ascii=False),
-                file_name=f"rescisao_{resumo['funcionario']['nome'].replace(' ', '_')}.json",
-                mime="application/json",
+                label='💾 Baixar Dados JSON',
+                data=json_str,
+                file_name='rescisao_dados.json',
+                mime='application/json',
                 use_container_width=True
             )
 
-    # Rodapé
-    st.divider()
-    st.markdown(
-        """
-        <div style='text-align: center; color: #666; padding: 20px;'>
-            <p><strong>Labor Termination Analyzer</strong> v1.1.0</p>
-            <p>📄 PDF/TXT → Formulário Editável → Relatório Profissional</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

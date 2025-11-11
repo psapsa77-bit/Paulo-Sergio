@@ -1,65 +1,104 @@
 #!/bin/bash
 
+clear
+
 echo "========================================"
-echo "  LABOR TERMINATION ANALYZER"
-echo "  Instalação Automática - Mac/Linux"
+echo "  INSTALADOR - Analisador de Rescisões"
+echo "  Trabalhistas v2.0"
+echo "========================================"
+echo ""
+echo "Este script irá instalar todas as"
+echo "dependências necessárias."
+echo ""
+echo "Pressione Enter para continuar..."
+read
+
+clear
+echo "========================================"
+echo "  Etapa 1/3: Verificando Python"
 echo "========================================"
 echo ""
 
-echo "[1/3] Verificando Python..."
 if ! command -v python3 &> /dev/null; then
+    echo "❌ ERRO: Python3 não encontrado!"
     echo ""
-    echo "ERRO: Python3 não encontrado!"
-    echo ""
-    echo "Por favor, instale o Python primeiro:"
+    echo "Por favor, instale Python 3.9 ou superior:"
     echo ""
     echo "Ubuntu/Debian:"
     echo "  sudo apt-get update"
-    echo "  sudo apt-get install python3 python3-pip"
+    echo "  sudo apt-get install python3 python3-pip python3-venv"
+    echo ""
+    echo "Fedora:"
+    echo "  sudo dnf install python3 python3-pip"
     echo ""
     echo "Mac (com Homebrew):"
     echo "  brew install python3"
     echo ""
-    echo "Depois execute este instalador novamente."
-    echo ""
     exit 1
 fi
 
-echo "OK! Python encontrado: $(python3 --version)"
+python3 --version
+echo "✅ Python encontrado!"
 echo ""
 
-echo "[2/3] Instalando dependências..."
-echo "Isso pode demorar alguns minutos..."
+echo "========================================"
+echo "  Etapa 2/3: Atualizando pip"
+echo "========================================"
+echo ""
 
-# Atualizar pip
 python3 -m pip install --upgrade pip
+echo ""
 
-# Instalar dependências
+echo "========================================"
+echo "  Etapa 3/3: Instalando dependências"
+echo "========================================"
+echo ""
+echo "Isso pode levar alguns minutos..."
+echo ""
+
 python3 -m pip install -r requirements.txt
 
 if [ $? -ne 0 ]; then
     echo ""
-    echo "ERRO na instalação!"
-    echo "Tente executar novamente ou instale manualmente:"
-    echo "  python3 -m pip install -r requirements.txt"
+    echo "⚠️ AVISO: Alguns pacotes podem ter falhado."
+    echo "Tentando instalar o pacote..."
     echo ""
-    exit 1
+    python3 -m pip install -e .
 fi
 
 echo ""
-echo "[3/3] Instalação concluída!"
+echo "Instalando o pacote labor-termination-analyzer..."
+python3 -m pip install -e .
+
+clear
+echo "========================================"
+echo "  ✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
+echo "========================================"
+echo ""
+echo "O aplicativo foi instalado com sucesso!"
+echo ""
+echo "PRÓXIMOS PASSOS:"
+echo ""
+echo "1️⃣  Execute: ./abrir.sh"
+echo ""
+echo "2️⃣  Ou no terminal: rescisao --help"
+echo ""
+echo "3️⃣  Para interface web: python3 run_web.py"
 echo ""
 echo "========================================"
-echo "  SUCESSO!"
+echo "  Comandos disponíveis:"
 echo "========================================"
 echo ""
-echo "Para abrir o programa:"
-echo "  - Execute: ./abrir.sh"
-echo "  Ou digite: python3 run_web.py"
+echo "rescisao exemplo          - Gera exemplo JSON"
+echo "rescisao analisar arquivo.json - Analisa rescisão"
+echo "rescisao extrair arquivo.pdf   - Extrai dados de PDF"
+echo ""
+echo "========================================"
 echo ""
 
-# Dar permissão de execução para o script de abrir
+# Dar permissão de execução para scripts
 chmod +x abrir.sh
+chmod +x run_web.py 2>/dev/null
 
 echo "Pressione Enter para sair..."
 read

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análise de Rescisão Trabalhista - {{ funcionario.nome }}</title>
+    <title>Análise de Rescisão Trabalhista - {{ resumo.funcionario.nome }}</title>
     <style>
         * {
             margin: 0;
@@ -24,115 +24,162 @@
             margin: 0 auto;
             background: white;
             padding: 40px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 10px;
         }
 
-        header {
+        .header {
             text-align: center;
-            margin-bottom: 40px;
-            padding-bottom: 20px;
+            padding-bottom: 30px;
             border-bottom: 3px solid #2c3e50;
+            margin-bottom: 30px;
         }
 
-        h1 {
+        .header h1 {
             color: #2c3e50;
             font-size: 2.5em;
             margin-bottom: 10px;
         }
 
-        h2 {
-            color: #34495e;
-            font-size: 1.8em;
-            margin-top: 30px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #ecf0f1;
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
         }
 
-        h3 {
-            color: #16a085;
-            font-size: 1.3em;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-
-        .info-section {
-            background: #ecf0f1;
+        .section {
+            margin: 30px 0;
             padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 30px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title::before {
+            content: "▸";
+            color: #3498db;
+            margin-right: 10px;
+            font-weight: bold;
         }
 
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
+            margin-top: 15px;
         }
 
         .info-item {
-            padding: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #3498db;
         }
 
         .info-label {
-            font-weight: bold;
             color: #7f8c8d;
             font-size: 0.9em;
             text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
         }
 
         .info-value {
             color: #2c3e50;
-            font-size: 1.1em;
-            margin-top: 5px;
+            font-size: 1.2em;
+            font-weight: bold;
         }
 
         .tipo-rescisao {
-            background: #3498db;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 25px;
-            border-radius: 5px;
-            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
         }
 
         .tipo-rescisao h3 {
-            color: white;
-            margin-top: 0;
+            font-size: 1.5em;
+            margin-bottom: 10px;
         }
 
-        .direitos-lista {
-            list-style: none;
+        .direitos-box {
+            background: white;
+            color: #333;
+            padding: 15px;
+            border-radius: 5px;
             margin-top: 15px;
         }
 
-        .direitos-lista li {
+        .direitos-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .direitos-box li {
             padding: 8px 0;
             padding-left: 25px;
             position: relative;
         }
 
-        .direitos-lista li:before {
+        .direitos-box li::before {
             content: "✓";
             position: absolute;
             left: 0;
-            color: #2ecc71;
+            color: #27ae60;
             font-weight: bold;
             font-size: 1.2em;
         }
 
-        .verba-card, .desconto-card {
-            background: #fff;
-            border: 1px solid #e0e0e0;
+        .perdas-box {
+            background: #fff3cd;
+            padding: 15px;
             border-radius: 5px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-top: 10px;
+            border-left: 4px solid #ffc107;
         }
 
-        .verba-card:hover, .desconto-card:hover {
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-            transition: all 0.3s ease;
+        .perdas-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .perdas-box li {
+            padding: 5px 0;
+            padding-left: 25px;
+            position: relative;
+            color: #856404;
+        }
+
+        .perdas-box li::before {
+            content: "✗";
+            position: absolute;
+            left: 0;
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .verba-item, .desconto-item {
+            background: white;
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .verba-item {
+            border-left: 5px solid #27ae60;
+        }
+
+        .desconto-item {
+            border-left: 5px solid #e74c3c;
         }
 
         .verba-header, .desconto-header {
@@ -140,10 +187,12 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
         }
 
-        .verba-titulo, .desconto-titulo {
-            font-size: 1.2em;
+        .verba-nome, .desconto-nome {
+            font-size: 1.3em;
             font-weight: bold;
             color: #2c3e50;
         }
@@ -160,19 +209,26 @@
             color: #e74c3c;
         }
 
-        .verba-descricao, .desconto-descricao {
-            color: #555;
-            margin-bottom: 10px;
-            line-height: 1.8;
+        .explicacao {
+            margin-top: 10px;
         }
 
-        .verba-calculo, .desconto-calculo {
-            background: #f8f9fa;
+        .explicacao-item {
+            margin: 10px 0;
             padding: 10px;
-            border-left: 4px solid #3498db;
-            font-style: italic;
-            color: #666;
-            margin-top: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .explicacao-titulo {
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .explicacao-texto {
+            color: #555;
+            line-height: 1.8;
         }
 
         .totais {
@@ -180,13 +236,7 @@
             color: white;
             padding: 30px;
             border-radius: 8px;
-            margin-top: 30px;
-        }
-
-        .totais h2 {
-            color: white;
-            border-bottom: 2px solid rgba(255,255,255,0.3);
-            margin-top: 0;
+            margin: 30px 0;
         }
 
         .totais-grid {
@@ -215,26 +265,50 @@
         }
 
         .valor-liquido {
-            background: rgba(46, 204, 113, 0.2);
-            border: 2px solid #2ecc71;
+            background: rgba(255,255,255,0.2) !important;
+            border: 2px solid white;
+        }
+
+        .alertas {
+            margin: 20px 0;
+        }
+
+        .alerta {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .alerta-info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .alerta-warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .alerta-error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
         }
 
         .observacoes {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 5px;
+            background: #e8f4f8;
             padding: 20px;
-            margin-top: 30px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
         }
 
-        .observacoes h3 {
-            color: #856404;
-            margin-top: 0;
-        }
-
-        footer {
+        .footer {
             text-align: center;
-            margin-top: 50px;
+            margin-top: 40px;
             padding-top: 20px;
             border-top: 2px solid #ecf0f1;
             color: #7f8c8d;
@@ -248,138 +322,234 @@
             }
             .container {
                 box-shadow: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
                 padding: 20px;
             }
-            .verba-card:hover, .desconto-card:hover {
-                transform: none;
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .info-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
+        <!-- CABEÇALHO -->
+        <div class="header">
             <h1>📋 Análise de Rescisão Trabalhista</h1>
-            <p>Documento explicativo detalhado</p>
-        </header>
+            <p>Relatório Detalhado com Explicações e Base Legal</p>
+        </div>
 
-        <!-- Informações do Funcionário -->
-        <section class="info-section">
-            <h2>👤 Dados do Funcionário</h2>
+        <!-- DADOS DO FUNCIONÁRIO -->
+        <div class="section">
+            <h2 class="section-title">Dados do Funcionário</h2>
             <div class="info-grid">
                 <div class="info-item">
                     <div class="info-label">Nome</div>
-                    <div class="info-value">{{ funcionario.nome }}</div>
+                    <div class="info-value">{{ resumo.funcionario.nome }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">CPF</div>
-                    <div class="info-value">{{ funcionario.cpf }}</div>
+                    <div class="info-value">{{ resumo.funcionario.cpf }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Cargo</div>
-                    <div class="info-value">{{ funcionario.cargo }}</div>
+                    <div class="info-value">{{ resumo.funcionario.cargo }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Data de Admissão</div>
-                    <div class="info-value">{{ funcionario.data_admissao }}</div>
+                    <div class="info-value">{{ resumo.funcionario.data_admissao | date_br }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Data de Demissão</div>
-                    <div class="info-value">{{ funcionario.data_demissao }}</div>
+                    <div class="info-value">{{ resumo.funcionario.data_demissao | date_br }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Tempo de Serviço</div>
-                    <div class="info-value">{{ funcionario.tempo_servico }}</div>
+                    <div class="info-value">{{ resumo.funcionario.tempo_servico_anos }} anos ({{ resumo.funcionario.tempo_servico_meses }} meses)</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Salário Bruto</div>
-                    <div class="info-value">{{ funcionario.salario_bruto }}</div>
+                    <div class="info-value">{{ resumo.funcionario.salario_bruto | currency }}</div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- Tipo de Rescisão -->
-        <section class="tipo-rescisao">
-            <h3>📑 {{ tipo_rescisao.nome }}</h3>
-            <p>{{ tipo_rescisao.descricao }}</p>
+        <!-- TIPO DE RESCISÃO -->
+        <div class="tipo-rescisao">
+            <h3>{{ resumo.direitos_tipo_rescisao.nome }}</h3>
+            <p>{{ resumo.direitos_tipo_rescisao.descricao }}</p>
 
-            {% if tipo_rescisao.direitos %}
-            <h4 style="margin-top: 20px; color: white;">Direitos do Trabalhador neste Tipo de Rescisão:</h4>
-            <ul class="direitos-lista">
-                {% for direito in tipo_rescisao.direitos %}
-                <li>{{ direito }}</li>
-                {% endfor %}
-            </ul>
+            {% if resumo.direitos_tipo_rescisao.direitos %}
+            <div class="direitos-box">
+                <strong>✅ Direitos neste tipo de rescisão:</strong>
+                <ul>
+                    {% for direito in resumo.direitos_tipo_rescisao.direitos %}
+                    <li>{{ direito }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
             {% endif %}
-        </section>
 
-        <!-- Verbas Rescisórias -->
-        <section>
-            <h2>💰 Verbas Rescisórias (Valores a Receber)</h2>
-            {% for verba in verbas %}
-            <div class="verba-card">
-                <div class="verba-header">
-                    <div class="verba-titulo">{{ verba.titulo }}</div>
-                    <div class="verba-valor">{{ verba.valor_formatado }}</div>
-                </div>
-                <div class="verba-descricao">{{ verba.descricao }}</div>
-                <div class="verba-calculo">
-                    <strong>Como é calculado:</strong> {{ verba.calculo }}
-                </div>
+            {% if resumo.direitos_tipo_rescisao.perdas %}
+            <div class="perdas-box">
+                <strong>⚠️ Perdas neste tipo de rescisão:</strong>
+                <ul>
+                    {% for perda in resumo.direitos_tipo_rescisao.perdas %}
+                    <li>{{ perda }}</li>
+                    {% endfor %}
+                </ul>
             </div>
-            {% endfor %}
-        </section>
+            {% endif %}
 
-        <!-- Descontos -->
-        {% if descontos %}
-        <section>
-            <h2>➖ Descontos</h2>
-            {% for desconto in descontos %}
-            <div class="desconto-card">
-                <div class="desconto-header">
-                    <div class="desconto-titulo">{{ desconto.titulo }}</div>
-                    <div class="desconto-valor">{{ desconto.valor_formatado }}</div>
-                </div>
-                <div class="desconto-descricao">{{ desconto.descricao }}</div>
-                <div class="desconto-calculo">
-                    <strong>Como é calculado:</strong> {{ desconto.calculo }}
-                </div>
+            {% if resumo.direitos_tipo_rescisao.observacoes %}
+            <div class="direitos-box" style="margin-top: 10px;">
+                <strong>📌 Observações importantes:</strong>
+                <ul>
+                    {% for obs in resumo.direitos_tipo_rescisao.observacoes %}
+                    <li>{{ obs }}</li>
+                    {% endfor %}
+                </ul>
             </div>
-            {% endfor %}
-        </section>
-        {% endif %}
+            {% endif %}
+        </div>
 
-        <!-- Totais -->
-        <section class="totais">
-            <h2>💵 Resumo Financeiro</h2>
+        <!-- VERBAS -->
+        <div class="section">
+            <h2 class="section-title">Verbas Rescisórias (Valores a Receber)</h2>
+
+            {% if resumo.verbas %}
+                {% for verba in resumo.verbas %}
+                <div class="verba-item">
+                    <div class="verba-header">
+                        <div class="verba-nome">{{ verba.nome }}</div>
+                        <div class="verba-valor">{{ verba.valor | currency }}</div>
+                    </div>
+
+                    <div class="explicacao">
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">💡 O que é?</div>
+                            <div class="explicacao-texto">{{ verba.explicacao.o_que_e }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">📚 Base Legal</div>
+                            <div class="explicacao-texto">{{ verba.explicacao.base_legal }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">🧮 Como é calculado</div>
+                            <div class="explicacao-texto" style="white-space: pre-line;">{{ verba.explicacao.calculo }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">📋 Quando se aplica</div>
+                            <div class="explicacao-texto">{{ verba.explicacao.quando_aplica }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="text-align: center; color: #7f8c8d; padding: 20px;">Nenhuma verba registrada.</p>
+            {% endif %}
+        </div>
+
+        <!-- DESCONTOS -->
+        <div class="section">
+            <h2 class="section-title">Descontos</h2>
+
+            {% if resumo.descontos %}
+                {% for desconto in resumo.descontos %}
+                <div class="desconto-item">
+                    <div class="desconto-header">
+                        <div class="desconto-nome">{{ desconto.nome }}</div>
+                        <div class="desconto-valor">{{ desconto.valor | currency }}</div>
+                    </div>
+
+                    <div class="explicacao">
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">💡 O que é?</div>
+                            <div class="explicacao-texto">{{ desconto.explicacao.o_que_e }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">📚 Base Legal</div>
+                            <div class="explicacao-texto">{{ desconto.explicacao.base_legal }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">🧮 Como é calculado</div>
+                            <div class="explicacao-texto" style="white-space: pre-line;">{{ desconto.explicacao.calculo }}</div>
+                        </div>
+
+                        <div class="explicacao-item">
+                            <div class="explicacao-titulo">📋 Quando se aplica</div>
+                            <div class="explicacao-texto">{{ desconto.explicacao.quando_aplica }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="text-align: center; color: #7f8c8d; padding: 20px;">Nenhum desconto registrado.</p>
+            {% endif %}
+        </div>
+
+        <!-- TOTAIS -->
+        <div class="totais">
+            <h2 style="text-align: center; margin-bottom: 10px;">💰 Resumo Financeiro</h2>
             <div class="totais-grid">
                 <div class="total-item">
                     <div class="total-label">Total de Verbas</div>
-                    <div class="total-valor">{{ totais.total_verbas_formatado }}</div>
+                    <div class="total-valor">{{ resumo.totais.verbas | currency }}</div>
                 </div>
                 <div class="total-item">
                     <div class="total-label">Total de Descontos</div>
-                    <div class="total-valor">{{ totais.total_descontos_formatado }}</div>
+                    <div class="total-valor">{{ resumo.totais.descontos | currency }}</div>
                 </div>
                 <div class="total-item valor-liquido">
-                    <div class="total-label">Valor Líquido a Receber</div>
-                    <div class="total-valor">{{ totais.valor_liquido_formatado }}</div>
+                    <div class="total-label">VALOR LÍQUIDO</div>
+                    <div class="total-valor">{{ resumo.totais.liquido | currency }}</div>
                 </div>
             </div>
-        </section>
+            <p style="text-align: center; margin-top: 15px; opacity: 0.9;">
+                Percentual de descontos: {{ resumo.totais.porcentagem_desconto | percentage }}
+            </p>
+        </div>
 
-        <!-- Observações -->
-        {% if observacoes %}
-        <section class="observacoes">
-            <h3>⚠️ Observações</h3>
-            <p>{{ observacoes }}</p>
-        </section>
+        <!-- ALERTAS -->
+        {% if resumo.alertas %}
+        <div class="alertas">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">⚠️ Verificações e Alertas</h3>
+            {% for alerta in resumo.alertas %}
+            <div class="alerta alerta-{{ alerta.tipo }}">
+                <strong>{{ alerta.campo }}:</strong> {{ alerta.mensagem }}
+            </div>
+            {% endfor %}
+        </div>
         {% endif %}
 
-        <footer>
-            <p>Documento gerado automaticamente pelo Labor Termination Analyzer</p>
-            <p>Este documento tem caráter informativo e explicativo.</p>
-        </footer>
+        <!-- OBSERVAÇÕES -->
+        {% if resumo.observacoes %}
+        <div class="observacoes">
+            <h3 style="color: #2c3e50; margin-bottom: 10px;">📝 Observações</h3>
+            <p>{{ resumo.observacoes }}</p>
+        </div>
+        {% endif %}
+
+        <!-- RODAPÉ -->
+        <div class="footer">
+            <p><strong>Labor Termination Analyzer</strong> - Análise de Rescisões Trabalhistas</p>
+            <p>Relatório gerado automaticamente com base na legislação trabalhista brasileira (CLT e CF/88)</p>
+            <p style="margin-top: 10px; font-size: 0.85em;">
+                ⚠️ Este relatório tem caráter informativo. Para questões jurídicas complexas, consulte um advogado trabalhista.
+            </p>
+        </div>
     </div>
 </body>
 </html>

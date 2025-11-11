@@ -1,55 +1,94 @@
 @echo off
+chcp 65001 >nul
+cls
+
 echo ========================================
-echo   LABOR TERMINATION ANALYZER
-echo   Instalacao Automatica - Windows
+echo  INSTALADOR - Analisador de Rescisões
+echo  Trabalhistas v2.0
+echo ========================================
+echo.
+echo Este script irá instalar todas as
+echo dependências necessárias.
+echo.
+echo Pressione qualquer tecla para continuar...
+pause >nul
+
+cls
+echo ========================================
+echo  Etapa 1/3: Verificando Python
 echo ========================================
 echo.
 
-echo [1/3] Verificando Python...
 python --version >nul 2>&1
-if errorlevel 1 (
+if %errorlevel% neq 0 (
+    echo ❌ ERRO: Python não encontrado!
     echo.
-    echo ERRO: Python nao encontrado!
+    echo Por favor, instale Python 3.9 ou superior:
+    echo https://www.python.org/downloads/
     echo.
-    echo Por favor, instale o Python primeiro:
-    echo 1. Acesse: https://www.python.org/downloads/
-    echo 2. Baixe a versao mais recente
-    echo 3. Durante instalacao, marque: "Add Python to PATH"
-    echo 4. Execute este instalador novamente
+    echo IMPORTANTE: Durante a instalação, marque a opção
+    echo "Add Python to PATH"
     echo.
     pause
     exit /b 1
 )
 
-echo OK! Python encontrado.
+python --version
+echo ✅ Python encontrado!
 echo.
 
-echo [2/3] Instalando dependencias...
-echo Isso pode demorar alguns minutos...
+echo ========================================
+echo  Etapa 2/3: Atualizando pip
+echo ========================================
+echo.
+
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+echo.
 
-if errorlevel 1 (
+echo ========================================
+echo  Etapa 3/3: Instalando dependências
+echo ========================================
+echo.
+echo Isso pode levar alguns minutos...
+echo.
+
+python -m pip install -r requirements.txt
+if %errorlevel% neq 0 (
     echo.
-    echo ERRO na instalacao!
-    echo Tente executar novamente ou instale manualmente:
-    echo    pip install -r requirements.txt
+    echo ⚠️ AVISO: Alguns pacotes podem ter falhado.
+    echo Tentando instalar o pacote...
     echo.
-    pause
-    exit /b 1
+    pip install -e .
 )
 
 echo.
-echo [3/3] Instalacao concluida!
+echo Instalando o pacote labor-termination-analyzer...
+pip install -e .
+
+cls
+echo ========================================
+echo  ✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!
+echo ========================================
+echo.
+echo O aplicativo foi instalado com sucesso!
+echo.
+echo PRÓXIMOS PASSOS:
+echo.
+echo 1️⃣ Execute: ABRIR_PROGRAMA.bat
+echo.
+echo 2️⃣ Ou no terminal: rescisao --help
+echo.
+echo 3️⃣ Para interface web: python run_web.py
 echo.
 echo ========================================
-echo   SUCESSO!
+echo  Comandos disponíveis:
 echo ========================================
 echo.
-echo Para abrir o programa:
-echo   - Duplo clique em: ABRIR_PROGRAMA.bat
+echo rescisao exemplo          - Gera exemplo JSON
+echo rescisao analisar arquivo.json - Analisa rescisão
+echo rescisao extrair arquivo.pdf   - Extrai dados de PDF
 echo.
-echo Ou digite no terminal:
-echo   python run_web.py
+echo ========================================
 echo.
+
 pause
