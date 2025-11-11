@@ -8,6 +8,8 @@ incluindo login, alternância entre empresas e navegação por menus.
 
 import logging
 import time
+import sys
+import asyncio
 from typing import List, Optional, Dict, Any
 from playwright.sync_api import (
     sync_playwright,
@@ -70,6 +72,20 @@ class FGTSNavigator:
             Exception: Se falhar ao iniciar o navegador
         """
         try:
+            # Corrigir problema do asyncio no Windows com Python 3.8+
+            # Necessário para o Playwright criar subprocessos corretamente
+            if sys.platform == 'win32':
+                # Python 3.13+ no Windows precisa usar WindowsSelectorEventLoopPolicy
+                if sys.version_info >= (3, 8):
+                    try:
+                        # Tentar usar WindowsSelectorEventLoopPolicy para compatibilidade
+                        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+                        logger.info("Event loop configurado para Windows (WindowsSelectorEventLoopPolicy)")
+                    except AttributeError:
+                        # Se não existir, usar o padrão
+                        logger.warning("WindowsSelectorEventLoopPolicy não disponível, usando padrão")
+                        pass
+
             logger.info("Iniciando navegador Playwright...")
 
             self.playwright = sync_playwright().start()
