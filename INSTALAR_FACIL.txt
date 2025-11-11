@@ -1,0 +1,167 @@
+========================================
+  INSTALAÇÃO FÁCIL - FGTS DIGITAL ROBOT
+========================================
+
+PARA LEIGOS - INSTRUÇÕES SIMPLES
+=================================
+
+Escolha a opção do seu sistema:
+
+
+>>> WINDOWS <<<
+---------------
+
+OPÇÃO 1 - MAIS FÁCIL (Duplo clique):
+
+   1. Localize o arquivo: INSTALAR_TUDO.bat
+   2. Dê DUPLO CLIQUE nele
+   3. Aguarde a instalação
+   4. Pronto!
+
+
+OPÇÃO 2 - Por linha de comando:
+
+   1. Abra o "Prompt de Comando" (CMD)
+      - Tecle: Windows + R
+      - Digite: cmd
+      - Pressione ENTER
+
+   2. Navegue até a pasta do projeto:
+      cd C:\caminho\para\Paulo-Sergio
+
+   3. Execute:
+      python instalar_playwright.py
+
+   4. Aguarde finalizar
+
+
+>>> LINUX / MAC <<<
+--------------------
+
+OPÇÃO 1 - MAIS FÁCIL (Duplo clique):
+
+   1. Localize o arquivo: INSTALAR_TUDO.sh
+   2. Dê DUPLO CLIQUE nele
+   3. Se pedir permissão, clique em "Executar"
+   4. Aguarde a instalação
+   5. Pronto!
+
+
+OPÇÃO 2 - Por terminal:
+
+   1. Abra o Terminal
+
+   2. Navegue até a pasta do projeto:
+      cd /caminho/para/Paulo-Sergio
+
+   3. Dê permissão de execução:
+      chmod +x INSTALAR_TUDO.sh
+
+   4. Execute:
+      ./INSTALAR_TUDO.sh
+
+   5. Aguarde finalizar
+
+
+========================================
+  DEPOIS DE INSTALAR
+========================================
+
+1. Execute o programa:
+
+   WINDOWS:
+   - Duplo clique em: run_fgts_robot.py
+   ou digite no CMD:
+   - python run_fgts_robot.py
+
+   LINUX/MAC:
+   - Abra o terminal
+   - Digite: python3 run_fgts_robot.py
+
+
+2. Abra seu navegador em:
+
+   http://localhost:8502
+
+
+3. Siga os passos na interface:
+
+   a) Clique em "Browse files"
+   b) Selecione seu certificado digital (.pfx ou .p12)
+   c) Digite a senha do certificado
+   d) Clique em "🔐 Autenticar"
+   e) Aguarde (pode abrir uma janela do navegador)
+   f) Pronto! Suas empresas aparecerão
+
+
+========================================
+  PROBLEMAS?
+========================================
+
+Se der erro "Python não encontrado":
+
+   WINDOWS:
+   1. Baixe o Python em: https://www.python.org/downloads/
+   2. IMPORTANTE: Marque a opção "Add to PATH"
+   3. Instale normalmente
+   4. Reinicie o computador
+   5. Tente novamente
+
+   LINUX:
+   sudo apt-get install python3 python3-pip
+
+   MAC:
+   brew install python3
+
+
+Se der erro de permissão (Linux/Mac):
+
+   chmod +x *.sh *.py
+   ./INSTALAR_TUDO.sh
+
+
+Se AINDA tiver problemas:
+
+   Entre em contato e envie:
+   1. Print da tela do erro
+   2. Qual sistema você usa (Windows/Linux/Mac)
+   3. Versão do Python (digite: python --version)
+
+
+========================================
+  DÚVIDAS FREQUENTES
+========================================
+
+P: Quanto tempo demora?
+R: 5 a 15 minutos, dependendo da internet
+
+P: Preciso de internet?
+R: Sim, para baixar os componentes
+
+P: Ocupa muito espaço?
+R: Cerca de 500 MB no total
+
+P: É seguro?
+R: Sim! Todo código é open-source e pode ser verificado
+
+P: Funciona offline depois?
+R: Não, precisa de internet para acessar o portal FGTS
+
+P: Preciso ser técnico para usar?
+R: Não! A interface é bem simples
+
+
+========================================
+  SUPORTE
+========================================
+
+Se precisar de ajuda, tenha em mãos:
+
+1. Qual sistema você usa
+2. Qual arquivo você clicou/executou
+3. Print da tela de erro
+4. Resultado do comando: python --version
+
+
+Bom uso! 🚀
+========================================
