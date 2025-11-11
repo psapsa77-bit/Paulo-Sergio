@@ -498,6 +498,17 @@ def main():
                     )
 
                     Path(pdf_path).unlink()
+            except RuntimeError as e:
+                # Erro específico de WeasyPrint não disponível
+                st.warning("⚠️ **PDF não disponível no Windows**")
+                st.info(
+                    "💡 **SOLUÇÃO RÁPIDA:**\n\n"
+                    "1. Baixe o relatório **HTML** (botão ao lado)\n"
+                    "2. Abra o HTML no navegador\n"
+                    "3. Pressione **Ctrl+P**\n"
+                    "4. Escolha **'Salvar como PDF'**\n\n"
+                    "Ou instale o GTK: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases"
+                )
             except Exception as e:
                 st.error(f"Erro ao gerar PDF: {str(e)}")
 

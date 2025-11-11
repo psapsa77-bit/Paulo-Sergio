@@ -7,7 +7,14 @@ from typing import Union
 import tempfile
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML
+
+# Importar WeasyPrint de forma opcional
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except (ImportError, OSError) as e:
+    WEASYPRINT_AVAILABLE = False
+    WEASYPRINT_ERROR = str(e)
 
 from .models import RescisaoTrabalhista
 from .analyzer import RescisaoAnalyzer
@@ -68,6 +75,18 @@ class PDFGenerator:
         Returns:
             Path: Caminho do arquivo gerado
         """
+        if not WEASYPRINT_AVAILABLE:
+            raise RuntimeError(
+                "Geração de PDF não disponível. WeasyPrint não está instalado corretamente.\n\n"
+                "SOLUÇÃO RÁPIDA: Use o relatório HTML ao invés do PDF!\n"
+                "O relatório HTML pode ser aberto no navegador e impresso como PDF (Ctrl+P > Salvar como PDF).\n\n"
+                "OU instale o GTK no Windows:\n"
+                "1. Baixe: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases\n"
+                "2. Execute o instalador\n"
+                "3. Reinicie o programa\n\n"
+                f"Erro técnico: {WEASYPRINT_ERROR if 'WEASYPRINT_ERROR' in globals() else 'WeasyPrint não disponível'}"
+            )
+
         # Gera HTML temporário
         with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as tmp:
             analyzer = RescisaoAnalyzer(rescisao)
