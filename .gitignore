@@ -60,3 +60,20 @@ output/
 # OS
 .DS_Store
 Thumbs.db
+
+# FGTS Robot - Dados sensíveis
+fgts_robot/.env
+fgts_robot/certificados/*.pfx
+fgts_robot/certificados/*.pem
+fgts_robot/certificados/*.key
+fgts_robot/certificados/*.crt
+fgts_robot/resultados/*.xlsx
+fgts_robot/resultados/*.xls
+fgts_robot/resultados/*.csv
+fgts_robot/logs/*.log
+fgts_robot/logs/screenshots/*.png
+
+# Permitir diretórios vazios
+!fgts_robot/certificados/.gitkeep
+!fgts_robot/resultados/.gitkeep
+!fgts_robot/logs/.gitkeep

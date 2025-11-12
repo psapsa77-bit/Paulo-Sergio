@@ -1,0 +1,18 @@
+# Lista de CNPJs para Processamento
+# Um CNPJ por linha
+# Linhas iniciadas com # são ignoradas
+
+# Exemplo de CNPJs (substitua pelos CNPJs reais):
+12345678000190
+98765432000110
+11122233000144
+
+# Você pode adicionar comentários para organizar:
+# --- Clientes Matriz ---
+44455566000177
+
+# --- Clientes Filial ---
+77788899000100
+00011122000133
+
+# Nota: O robô irá processar todos os CNPJs válidos desta lista

@@ -1,0 +1,20 @@
+# Robô de Automação FGTS Digital - Dependências
+
+# Automação Web
+playwright>=1.40.0
+
+# Manipulação de Dados
+pandas>=2.1.0
+openpyxl>=3.1.0
+
+# Certificados Digitais
+cryptography>=41.0.0
+
+# Variáveis de Ambiente
+python-dotenv>=1.0.0
+
+# Utilitários
+python-dateutil>=2.8.0
+
+# Instalação do Playwright (executar após pip install)
+# playwright install chromium
