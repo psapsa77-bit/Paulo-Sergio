@@ -8,7 +8,8 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 - [Requisitos](#-requisitos)
 - [Instalação](#-instalação)
 - [Configuração](#-configuração)
-- [Uso](#-uso)
+- [Interface Web](#-interface-web)
+- [Uso CLI](#-uso-cli)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Exemplos](#-exemplos)
 - [Solução de Problemas](#-solução-de-problemas)
@@ -17,6 +18,8 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 
 ## 🚀 Funcionalidades
 
+- ✅ **Interface Web** moderna e intuitiva (Streamlit)
+- ✅ **Interface CLI** completa para terminal
 - ✅ Autenticação automática com certificado digital A1 (.pfx)
 - ✅ Gestão de múltiplas empresas via procuração eletrônica
 - ✅ Extração completa de guias FGTS (pagas e pendentes)
@@ -25,7 +28,6 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 - ✅ Logs detalhados para debug
 - ✅ Screenshots automáticos em caso de erro
 - ✅ Delays aleatórios para simular comportamento humano
-- ✅ Interface CLI amigável
 
 ## 📦 Requisitos
 
@@ -45,6 +47,7 @@ Todas as dependências estão listadas no arquivo `requirements.txt`:
 - `openpyxl` - Criação de arquivos Excel
 - `cryptography` - Manipulação de certificados
 - `python-dotenv` - Gerenciamento de variáveis de ambiente
+- `streamlit` - Interface web
 
 ## 🔧 Instalação
 
@@ -115,7 +118,66 @@ cp /caminho/do/seu/certificado.pfx certificados/
 
 ⚠️ **IMPORTANTE:** Nunca commite seu certificado ou arquivo .env no git!
 
-## 📖 Uso
+## 🌐 Interface Web
+
+### Abrir Interface Web (Recomendado para Iniciantes)
+
+A forma mais fácil de usar o robô é através da **interface web**:
+
+#### Windows
+
+Clique duas vezes no arquivo:
+```
+ABRIR_FGTS.bat
+```
+
+Ou execute no terminal:
+```cmd
+ABRIR_FGTS.bat
+```
+
+#### Linux/macOS
+
+```bash
+./abrir_fgts.sh
+```
+
+Ou:
+```bash
+python run_fgts_web.py
+```
+
+A interface web será aberta automaticamente no seu navegador em: **http://localhost:8501**
+
+### Recursos da Interface Web
+
+- 🎨 **Interface Moderna**: Design limpo e intuitivo
+- 📤 **Upload de Certificado**: Faça upload direto na interface
+- 📋 **Múltiplas Formas de Entrada**: Digite CNPJs, cole lista ou faça upload de arquivo
+- 📊 **Visualização de Resultados**: Veja os dados extraídos diretamente na web
+- 💾 **Download Direto**: Baixe o Excel gerado com um clique
+- 📝 **Logs em Tempo Real**: Acompanhe o processamento
+- ⚙️ **Configurações Visuais**: Ajuste todas as opções sem editar arquivos
+
+### Como Usar a Interface Web
+
+1. **Abrir**: Execute `ABRIR_FGTS.bat` (Windows) ou `./abrir_fgts.sh` (Linux/macOS)
+2. **Configurar**: Na barra lateral, faça upload do certificado e digite a senha
+3. **Adicionar CNPJs**: Digite, cole ou faça upload de um arquivo com os CNPJs
+4. **Processar**: Clique no botão "PROCESSAR"
+5. **Baixar**: Após conclusão, baixe o arquivo Excel na aba "Resultados"
+
+### Screenshot da Interface
+
+A interface possui 3 abas principais:
+
+- **🚀 Processar**: Adicione CNPJs e execute o robô
+- **📊 Resultados**: Visualize e baixe os arquivos gerados
+- **📝 Logs**: Acompanhe logs de execução em tempo real
+
+## 📖 Uso CLI
+
+Se você prefere usar linha de comando, o robô também possui uma interface CLI completa.
 
 ### Modo Interativo
 

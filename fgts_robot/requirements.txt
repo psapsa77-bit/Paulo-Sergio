@@ -16,5 +16,8 @@ python-dotenv>=1.0.0
 # Utilitários
 python-dateutil>=2.8.0
 
+# Interface Web
+streamlit>=1.28.0
+
 # Instalação do Playwright (executar após pip install)
 # playwright install chromium
