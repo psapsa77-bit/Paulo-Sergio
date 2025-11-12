@@ -29,9 +29,9 @@ BROWSER_TIMEOUT = int(os.getenv("TIMEOUT", "30000"))  # 30 segundos padrão
 SLOW_MO = int(os.getenv("SLOW_MO", "100"))  # Delay em ms entre ações
 
 # URLs do FGTS Digital
-FGTS_URL_BASE = "https://fgtsdigital.caixa.gov.br"
-FGTS_URL_LOGIN = f"{FGTS_URL_BASE}/login"
-FGTS_URL_CONSULTA_GUIAS = f"{FGTS_URL_BASE}/guias"
+FGTS_URL_BASE = "https://fgtsdigital.sistema.gov.br"
+FGTS_URL_LOGIN = f"{FGTS_URL_BASE}/portal"
+FGTS_URL_CONSULTA_GUIAS = f"{FGTS_URL_BASE}/portal/guias"
 
 # Timeouts específicos (em milissegundos)
 TIMEOUT_PAGE_LOAD = 60000  # 60 segundos para carregamento de página

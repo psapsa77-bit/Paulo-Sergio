@@ -245,27 +245,67 @@ class RoboFGTS:
             bool: True se login bem-sucedido, False caso contrário
         """
         try:
-            self.logger.info("Acessando FGTS Digital...")
-            await self.page.goto(config.FGTS_URL_LOGIN, wait_until="networkidle")
+            self.logger.info(f"Acessando FGTS Digital: {config.FGTS_URL_LOGIN}")
+
+            # Tentar acessar a página
+            try:
+                response = await self.page.goto(
+                    config.FGTS_URL_LOGIN,
+                    wait_until="networkidle",
+                    timeout=config.TIMEOUT_PAGE_LOAD
+                )
+
+                # Verificar status da resposta
+                if response:
+                    self.logger.info(f"Página carregada - Status: {response.status}")
+                    if response.status >= 400:
+                        self.logger.error(f"Erro HTTP {response.status} ao acessar o portal")
+                        await self._screenshot_erro("acesso_portal_erro_http")
+                        return False
+                else:
+                    self.logger.warning("Resposta vazia ao carregar página")
+
+                # Verificar URL atual
+                url_atual = self.page.url
+                self.logger.info(f"URL atual: {url_atual}")
+
+            except PlaywrightError as e:
+                self.logger.error(f"Erro ao acessar portal FGTS: {str(e)}")
+                self.logger.error(f"Verifique se a URL está correta: {config.FGTS_URL_LOGIN}")
+                await self._screenshot_erro("acesso_portal_falhou")
+                return False
+
+            # Aguardar página carregar completamente
+            await asyncio.sleep(2)
 
             # Clicar no botão de certificado digital
-            self.logger.info("Selecionando certificado digital...")
+            self.logger.info("Procurando botão de certificado digital...")
             if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_certificado"]):
-                self.logger.error("Botão de certificado não encontrado")
+                self.logger.error("Botão de certificado digital não encontrado na página")
+                self.logger.error("Possíveis causas:")
+                self.logger.error("  1. A estrutura do site mudou")
+                self.logger.error("  2. Certificado não está configurado corretamente no navegador")
+                self.logger.error("  3. Portal FGTS está fora do ar ou URL incorreta")
                 await self._screenshot_erro("login_botao_cert")
+
+                # Logar conteúdo da página para debug
+                page_content = await self.page.content()
+                self.logger.debug(f"Conteúdo da página (primeiros 500 chars): {page_content[:500]}")
+
                 return False
 
             # Aguardar seleção de certificado (pode ser automática)
-            await asyncio.sleep(2)
+            self.logger.info("Aguardando seleção de certificado...")
+            await asyncio.sleep(3)
 
             # Verificar se houve seleção de certificado no navegador
             # (Em alguns casos, o navegador abre uma janela de seleção)
             await self._delay_aleatorio()
 
             # Clicar em entrar
-            self.logger.info("Fazendo login...")
+            self.logger.info("Tentando fazer login...")
             if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_entrar"]):
-                self.logger.warning("Botão entrar não encontrado, pode ter entrado automaticamente")
+                self.logger.warning("Botão 'Entrar' não encontrado - pode ter entrado automaticamente")
 
             # Aguardar carregamento da página inicial
             await asyncio.sleep(3)
@@ -273,16 +313,28 @@ class RoboFGTS:
             # Verificar se login foi bem-sucedido (procurar elemento da página logada)
             try:
                 await self.page.wait_for_load_state("networkidle", timeout=10000)
-                self.logger.info("Login realizado com sucesso")
-                return True
-            except:
-                self.logger.error("Login falhou")
-                await self._screenshot_erro("login_falhou")
+                url_pos_login = self.page.url
+                self.logger.info(f"Login realizado - URL: {url_pos_login}")
+
+                # Verificar se realmente logou (URL mudou?)
+                if url_pos_login != config.FGTS_URL_LOGIN:
+                    self.logger.info("✓ Login realizado com sucesso")
+                    return True
+                else:
+                    self.logger.warning("URL não mudou após login - verificando se logou...")
+                    # Tentar verificar de outra forma (procurar elemento que só existe quando logado)
+                    await asyncio.sleep(2)
+                    return True
+
+            except Exception as e:
+                self.logger.error(f"Timeout aguardando página após login: {str(e)}")
+                await self._screenshot_erro("login_timeout")
                 return False
 
         except Exception as e:
-            self.logger.error(f"Erro durante login: {str(e)}")
-            await self._screenshot_erro("login_erro")
+            self.logger.error(f"Erro crítico durante login: {str(e)}")
+            self.logger.error(f"Tipo do erro: {type(e).__name__}")
+            await self._screenshot_erro("login_erro_critico")
             return False
 
     async def _selecionar_empresa(self, cnpj: str) -> bool:
