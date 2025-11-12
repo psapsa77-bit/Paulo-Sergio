@@ -561,20 +561,67 @@ class RoboFGTS:
             bool: True se processamento bem-sucedido
         """
         try:
+            self.logger.info("="*60)
+            self.logger.info("INICIANDO PROCESSAMENTO FGTS")
+            self.logger.info("="*60)
+
             # Validar certificado
-            if not self._validar_certificado():
-                self.logger.error("Certificado inválido. Abortando execução.")
+            self.logger.info("Etapa 1/4: Validando certificado digital...")
+            self.logger.info(f"  Caminho do certificado: {self.cert_path}")
+
+            try:
+                if not self._validar_certificado():
+                    self.logger.error("❌ Certificado inválido. Abortando execução.")
+                    self.logger.error("Verifique:")
+                    self.logger.error(f"  1. Se o arquivo existe: {self.cert_path}")
+                    self.logger.error("  2. Se a senha está correta no .env")
+                    self.logger.error("  3. Se é um certificado A1 válido (.pfx)")
+                    return False
+                self.logger.info("  ✓ Certificado validado com sucesso")
+            except Exception as e:
+                self.logger.error(f"❌ Erro ao validar certificado: {str(e)}")
+                self.logger.exception("Traceback completo:")
                 return False
 
             # Iniciar navegador
-            await self._iniciar_navegador()
+            self.logger.info("Etapa 2/4: Iniciando navegador...")
+            self.logger.info(f"  Modo headless: {self.headless}")
+
+            try:
+                await self._iniciar_navegador()
+                self.logger.info("  ✓ Navegador iniciado com sucesso")
+            except Exception as e:
+                self.logger.error(f"❌ Erro ao iniciar navegador: {str(e)}")
+                self.logger.exception("Traceback completo:")
+                self.logger.error("Possíveis causas:")
+                self.logger.error("  1. Playwright não está instalado (execute: playwright install chromium)")
+                self.logger.error("  2. Problemas com permissões do sistema")
+                self.logger.error("  3. Falta de dependências do Chromium")
+                return False
 
             # Fazer login
-            if not await self._fazer_login():
-                self.logger.error("Falha no login. Abortando execução.")
+            self.logger.info("Etapa 3/4: Fazendo login no portal FGTS...")
+            self.logger.info(f"  URL: {config.FGTS_URL_LOGIN}")
+
+            try:
+                if not await self._fazer_login():
+                    self.logger.error("❌ Falha no login. Abortando execução.")
+                    self.logger.error("Verifique:")
+                    self.logger.error("  1. Se o portal está acessível (execute: python testar_conexao.py)")
+                    self.logger.error("  2. Se o certificado está configurado corretamente")
+                    self.logger.error("  3. Screenshots em: logs/screenshots/")
+                    return False
+                self.logger.info("  ✓ Login realizado com sucesso")
+            except Exception as e:
+                self.logger.error(f"❌ Erro durante login: {str(e)}")
+                self.logger.exception("Traceback completo:")
                 return False
 
             # Processar cada empresa
+            self.logger.info("Etapa 4/4: Processando empresas...")
+            self.logger.info(f"  Total de CNPJs: {len(lista_cnpj)}")
+            self.logger.info("")
+
             todos_dados = []
             for i, cnpj in enumerate(lista_cnpj, 1):
                 self.logger.info(f"Processando {i}/{len(lista_cnpj)}: {cnpj}")
@@ -584,29 +631,46 @@ class RoboFGTS:
                     todos_dados.extend(guias)
 
                     if guias:
-                        self.logger.info(f"✓ {len(guias)} guias extraídas de {cnpj}")
+                        self.logger.info(f"  ✓ {len(guias)} guias extraídas de {cnpj}")
                     else:
-                        self.logger.warning(f"✗ Nenhuma guia encontrada para {cnpj}")
+                        self.logger.warning(f"  ⚠ Nenhuma guia encontrada para {cnpj}")
 
                 except Exception as e:
-                    self.logger.error(f"Erro ao processar {cnpj}: {str(e)}")
+                    self.logger.error(f"  ❌ Erro ao processar {cnpj}: {str(e)}")
+                    self.logger.exception("  Traceback completo:")
                     continue
 
             # Exportar resultados
+            self.logger.info("")
+            self.logger.info("="*60)
             if todos_dados:
+                self.logger.info("Exportando resultados...")
                 self._exportar_excel(todos_dados)
-                self.logger.info(f"Processamento concluído: {len(todos_dados)} guias extraídas")
+                self.logger.info(f"✅ Processamento concluído: {len(todos_dados)} guias extraídas")
             else:
-                self.logger.warning("Nenhum dado foi extraído")
+                self.logger.warning("⚠ Nenhum dado foi extraído")
 
+            self.logger.info("="*60)
             return True
 
         except Exception as e:
-            self.logger.error(f"Erro durante processamento: {str(e)}")
-            await self._screenshot_erro("erro_geral")
+            self.logger.error("="*60)
+            self.logger.error(f"❌ ERRO CRÍTICO DURANTE PROCESSAMENTO")
+            self.logger.error(f"Tipo do erro: {type(e).__name__}")
+            self.logger.error(f"Mensagem: {str(e)}")
+            self.logger.error("="*60)
+            self.logger.exception("Traceback completo do erro:")
+
+            try:
+                await self._screenshot_erro("erro_geral")
+                self.logger.error(f"Screenshot salvo em: logs/screenshots/")
+            except:
+                pass
+
             return False
 
         finally:
+            self.logger.info("Fechando navegador...")
             await self._fechar_navegador()
 
     def processar_clientes(self, lista_cnpj: List[str]) -> bool:
