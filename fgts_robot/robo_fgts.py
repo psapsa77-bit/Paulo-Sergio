@@ -13,7 +13,11 @@ from cryptography.hazmat.backends import default_backend
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Error as PlaywrightError
 import pandas as pd
 
-from . import config
+# Import flexível para funcionar como módulo ou script direto
+try:
+    from . import config
+except ImportError:
+    import config
 
 
 class RoboFGTS:

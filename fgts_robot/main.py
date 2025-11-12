@@ -12,6 +12,9 @@ import sys
 from pathlib import Path
 from typing import List
 
+# Adicionar diretório atual ao path para imports funcionarem
+sys.path.insert(0, str(Path(__file__).parent))
+
 from robo_fgts import RoboFGTS
 import config
 

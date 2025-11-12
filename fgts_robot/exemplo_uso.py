@@ -5,9 +5,14 @@ Exemplos práticos de uso do Robô FGTS Digital
 Este arquivo contém diferentes exemplos de como usar o robô
 em diferentes cenários.
 """
-
-from fgts_robot import RoboFGTS
+import sys
+from pathlib import Path
 import asyncio
+
+# Adicionar diretório atual ao path para imports funcionarem
+sys.path.insert(0, str(Path(__file__).parent))
+
+from robo_fgts import RoboFGTS
 
 
 def exemplo_basico():
