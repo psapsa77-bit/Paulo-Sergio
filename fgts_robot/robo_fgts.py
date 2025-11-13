@@ -1190,6 +1190,274 @@ class RoboFGTS:
             # Continuar mesmo com erro
             return True
 
+    async def _trocar_perfil_procurador(self, cnpj: str) -> bool:
+        """
+        Clica em "Trocar Perfil", seleciona "procurador" e digita CNPJ
+
+        Args:
+            cnpj: CNPJ da empresa para acessar como procurador
+
+        Returns:
+            bool: True se conseguiu trocar o perfil, False caso contrário
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("🔄 TROCANDO PERFIL PARA PROCURADOR...")
+            self.logger.info("=" * 70)
+
+            # Passo 1: Clicar no botão "Trocar Perfil"
+            self.logger.info("🔍 Procurando botão 'Trocar Perfil'...")
+
+            seletores_trocar_perfil = [
+                "button:has-text('Trocar Perfil')",
+                "button:has-text('Trocar perfil')",
+                "a:has-text('Trocar Perfil')",
+                "[aria-label*='Trocar']",
+                "#btn-trocar-perfil",
+                ".btn-trocar-perfil"
+            ]
+
+            clicou_trocar = False
+            for seletor in seletores_trocar_perfil:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        await elemento.click()
+                        clicou_trocar = True
+                        self.logger.info("✅ Clicado em 'Trocar Perfil'!")
+                        break
+                except:
+                    continue
+
+            if not clicou_trocar:
+                # Tentar via JavaScript
+                self.logger.info("Tentando clicar via JavaScript...")
+                resultado = await self.page.evaluate("""
+                    () => {
+                        const elementos = document.querySelectorAll('button, a');
+                        for (const el of elementos) {
+                            const texto = (el.innerText || '').toLowerCase();
+                            if (texto.includes('trocar perfil')) {
+                                el.click();
+                                return { success: true, texto: el.innerText };
+                            }
+                        }
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    clicou_trocar = True
+                    self.logger.info(f"✅ Clicado via JavaScript: {resultado.get('texto')}")
+
+            if not clicou_trocar:
+                self.logger.error("❌ Não foi possível encontrar botão 'Trocar Perfil'")
+                await self._screenshot_erro("trocar_perfil_nao_encontrado")
+                return False
+
+            # Aguardar pop-up aparecer
+            await asyncio.sleep(2)
+
+            # Passo 2: Selecionar opção "Procurador"
+            self.logger.info("")
+            self.logger.info("🔍 Procurando opção 'Procurador' no pop-up...")
+
+            seletores_procurador = [
+                # Radio buttons
+                "input[type='radio'][value*='procurador']",
+                "input[type='radio'][value*='PROCURADOR']",
+                "input[type='radio'][id*='procurador']",
+
+                # Labels
+                "label:has-text('Procurador')",
+                "label:has-text('Sou Procurador')",
+
+                # Divs/spans clicáveis
+                "div:has-text('Procurador')",
+                "span:has-text('Procurador')",
+
+                # Select options
+                "select option:has-text('Procurador')"
+            ]
+
+            selecionou_procurador = False
+
+            # Primeiro tentar radio buttons
+            for seletor in seletores_procurador[:3]:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento:
+                        await elemento.click()
+                        selecionou_procurador = True
+                        self.logger.info("✅ Selecionado 'Procurador' (radio button)")
+                        break
+                except:
+                    continue
+
+            # Se não encontrou radio, tentar labels e divs
+            if not selecionou_procurador:
+                for seletor in seletores_procurador[3:]:
+                    try:
+                        elemento = await self.page.query_selector(seletor)
+                        if elemento and await elemento.is_visible():
+                            await elemento.click()
+                            selecionou_procurador = True
+                            self.logger.info(f"✅ Clicado em 'Procurador' ({seletor})")
+                            break
+                    except:
+                        continue
+
+            # Tentar via JavaScript como fallback
+            if not selecionou_procurador:
+                self.logger.info("Tentando selecionar 'Procurador' via JavaScript...")
+                resultado = await self.page.evaluate("""
+                    () => {
+                        // Tentar radio buttons
+                        const radios = document.querySelectorAll('input[type="radio"]');
+                        for (const radio of radios) {
+                            const label = radio.labels ? radio.labels[0] : null;
+                            const labelText = label ? label.innerText.toLowerCase() : '';
+                            const value = (radio.value || '').toLowerCase();
+
+                            if (labelText.includes('procurador') || value.includes('procurador')) {
+                                radio.click();
+                                return { success: true, tipo: 'radio', texto: labelText || value };
+                            }
+                        }
+
+                        // Tentar labels
+                        const labels = document.querySelectorAll('label');
+                        for (const label of labels) {
+                            if (label.innerText.toLowerCase().includes('procurador')) {
+                                label.click();
+                                return { success: true, tipo: 'label', texto: label.innerText };
+                            }
+                        }
+
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    selecionou_procurador = True
+                    self.logger.info(f"✅ Selecionado via JavaScript: {resultado.get('texto')}")
+
+            if not selecionou_procurador:
+                self.logger.warning("⚠️  Não foi possível selecionar 'Procurador'")
+                await self._screenshot_erro("procurador_nao_encontrado")
+
+            await asyncio.sleep(1)
+
+            # Passo 3: Digitar CNPJ no campo
+            self.logger.info("")
+            self.logger.info(f"🔍 Procurando campo para digitar CNPJ: {cnpj}")
+
+            seletores_cnpj = [
+                "input[name*='cnpj']",
+                "input[id*='cnpj']",
+                "input[placeholder*='CNPJ']",
+                "input[placeholder*='cnpj']",
+                "input[type='text'][name*='empresa']",
+                "input[type='text'][id*='empresa']",
+                "input[type='text']"  # Último recurso: qualquer input text
+            ]
+
+            digitou_cnpj = False
+
+            for seletor in seletores_cnpj:
+                try:
+                    elementos = await self.page.query_selector_all(seletor)
+                    for elemento in elementos:
+                        if await elemento.is_visible():
+                            # Limpar campo primeiro
+                            await elemento.fill("")
+                            # Digitar CNPJ
+                            await elemento.fill(cnpj)
+                            digitou_cnpj = True
+                            self.logger.info(f"✅ CNPJ digitado: {cnpj}")
+                            break
+                    if digitou_cnpj:
+                        break
+                except Exception as e:
+                    continue
+
+            if not digitou_cnpj:
+                self.logger.error("❌ Não foi possível encontrar campo para digitar CNPJ")
+                await self._screenshot_erro("campo_cnpj_nao_encontrado")
+                return False
+
+            await asyncio.sleep(1)
+
+            # Passo 4: Clicar em confirmar/definir/ok
+            self.logger.info("")
+            self.logger.info("🔍 Procurando botão de confirmação...")
+
+            seletores_confirmar = [
+                "button:has-text('Definir')",
+                "button:has-text('Confirmar')",
+                "button:has-text('OK')",
+                "button:has-text('Acessar')",
+                "button:has-text('Continuar')",
+                "button[type='submit']"
+            ]
+
+            confirmou = False
+
+            for seletor in seletores_confirmar:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        texto = await elemento.inner_text()
+                        await elemento.click()
+                        confirmou = True
+                        self.logger.info(f"✅ Clicado em '{texto.strip()}'!")
+                        break
+                except:
+                    continue
+
+            if not confirmou:
+                # Tentar via JavaScript
+                resultado = await self.page.evaluate("""
+                    () => {
+                        const botoes = document.querySelectorAll('button, input[type="submit"]');
+                        for (const btn of botoes) {
+                            const texto = (btn.innerText || btn.value || '').toLowerCase();
+                            if (texto.includes('definir') || texto.includes('confirmar') ||
+                                texto.includes('ok') || texto.includes('acessar')) {
+                                btn.click();
+                                return { success: true, texto: btn.innerText || btn.value };
+                            }
+                        }
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    confirmou = True
+                    self.logger.info(f"✅ Confirmado via JavaScript: {resultado.get('texto')}")
+
+            if not confirmou:
+                self.logger.warning("⚠️  Não foi possível clicar em botão de confirmação")
+                await self._screenshot_erro("confirmar_nao_encontrado")
+
+            # Aguardar carregamento
+            await asyncio.sleep(3)
+
+            url_final = self.page.url
+            self.logger.info(f"📍 URL após trocar perfil: {url_final}")
+
+            self.logger.info("=" * 70)
+            self.logger.info("✅ Troca de perfil concluída!")
+            self.logger.info("=" * 70)
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao trocar perfil: {str(e)}")
+            self.logger.exception("Traceback:")
+            await self._screenshot_erro("erro_trocar_perfil")
+            return False
+
     async def _explorar_pagina_inicial(self) -> dict:
         """
         Explora e mapeia a estrutura da página inicial após login
@@ -2111,6 +2379,19 @@ class RoboFGTS:
             except Exception as e:
                 self.logger.warning(f"Erro durante exploração de navegação: {str(e)}")
                 self.logger.warning("Continuando com processamento...")
+
+            self.logger.info("")
+
+            # Trocar perfil para procurador (para cada CNPJ)
+            # Isso permite acessar dados das empresas via procuração eletrônica
+            for cnpj in lista_cnpj:
+                try:
+                    self.logger.info("")
+                    await self._trocar_perfil_procurador(cnpj)
+                    break  # Só precisa trocar uma vez para a primeira empresa
+                except Exception as e:
+                    self.logger.warning(f"Erro ao trocar perfil para {cnpj}: {str(e)}")
+                    self.logger.warning("Continuando com processamento...")
 
             self.logger.info("")
 
