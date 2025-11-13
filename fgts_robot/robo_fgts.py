@@ -1495,6 +1495,266 @@ class RoboFGTS:
             await self._screenshot_erro("erro_trocar_perfil")
             return False
 
+    async def _buscar_competencias_em_aberto(self) -> List[str]:
+        """
+        Navega até Gestão de Guias > Emissão de Guia Rápida
+        e busca competências em aberto no dropdown de Competência de Apuração
+
+        Returns:
+            List[str]: Lista de competências em aberto encontradas
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("📋 BUSCANDO COMPETÊNCIAS EM ABERTO...")
+            self.logger.info("=" * 70)
+
+            competencias = []
+
+            # Passo 1: Clicar em "Gestão de Guias"
+            self.logger.info("")
+            self.logger.info("🔍 Passo 1: Procurando 'Gestão de Guias'...")
+
+            seletores_gestao_guias = [
+                "text='Gestão de Guias'",
+                "text='GESTÃO DE GUIAS'",
+                "text='Gestão de guias'",
+                "div:has-text('GESTÃO DE GUIAS')",
+                "a:has-text('Gestão de Guias')",
+                ".cardListItem:has-text('GESTÃO DE GUIAS')",
+                ".amplo:has-text('GESTÃO DE GUIAS')"
+            ]
+
+            clicou_gestao = False
+            for seletor in seletores_gestao_guias:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        await elemento.click()
+                        clicou_gestao = True
+                        self.logger.info("✅ Clicado em 'Gestão de Guias'!")
+                        break
+                except:
+                    continue
+
+            if not clicou_gestao:
+                # Tentar via JavaScript
+                self.logger.info("Tentando clicar via JavaScript...")
+                resultado = await self.page.evaluate("""
+                    () => {
+                        const elementos = document.querySelectorAll('div, a, button, span');
+                        for (const el of elementos) {
+                            const texto = (el.innerText || '').toLowerCase();
+                            if (texto.includes('gestão de guias')) {
+                                el.click();
+                                return { success: true, texto: el.innerText };
+                            }
+                        }
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    clicou_gestao = True
+                    self.logger.info(f"✅ Clicado via JavaScript: {resultado.get('texto')}")
+
+            if not clicou_gestao:
+                self.logger.error("❌ Não foi possível encontrar 'Gestão de Guias'")
+                await self._screenshot_erro("gestao_guias_nao_encontrado")
+                return []
+
+            # Aguardar carregamento
+            await asyncio.sleep(3)
+
+            # Passo 2: Clicar em "Emissão de Guia Rápida"
+            self.logger.info("")
+            self.logger.info("🔍 Passo 2: Procurando 'Emissão de Guia Rápida'...")
+
+            seletores_emissao = [
+                "text='Emissão de Guia Rápida'",
+                "text='EMISSÃO DE GUIA RÁPIDA'",
+                "text='Emissão de guia rápida'",
+                "a:has-text('Emissão de Guia Rápida')",
+                "button:has-text('Emissão de Guia Rápida')",
+                "div:has-text('Emissão de Guia Rápida')",
+                "[href*='emissao']",
+                "[href*='guia-rapida']"
+            ]
+
+            clicou_emissao = False
+            for seletor in seletores_emissao:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        await elemento.click()
+                        clicou_emissao = True
+                        self.logger.info("✅ Clicado em 'Emissão de Guia Rápida'!")
+                        break
+                except:
+                    continue
+
+            if not clicou_emissao:
+                # Tentar via JavaScript
+                self.logger.info("Tentando clicar via JavaScript...")
+                resultado = await self.page.evaluate("""
+                    () => {
+                        const elementos = document.querySelectorAll('a, button, div, span');
+                        for (const el of elementos) {
+                            const texto = (el.innerText || '').toLowerCase();
+                            if (texto.includes('emissão de guia rápida') ||
+                                texto.includes('emissao de guia rapida')) {
+                                el.click();
+                                return { success: true, texto: el.innerText };
+                            }
+                        }
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    clicou_emissao = True
+                    self.logger.info(f"✅ Clicado via JavaScript: {resultado.get('texto')}")
+
+            if not clicou_emissao:
+                self.logger.error("❌ Não foi possível encontrar 'Emissão de Guia Rápida'")
+                await self._screenshot_erro("emissao_guia_rapida_nao_encontrado")
+                return []
+
+            # Aguardar carregamento da página de emissão
+            await asyncio.sleep(3)
+
+            # Passo 3: Encontrar e clicar no campo "Competência de Apuração"
+            self.logger.info("")
+            self.logger.info("🔍 Passo 3: Procurando campo 'Competência de Apuração'...")
+
+            seletores_competencia = [
+                "select[name*='competencia']",
+                "select[id*='competencia']",
+                "select[name*='apuracao']",
+                "select[id*='apuracao']",
+                "select",  # Qualquer select na página
+                ".br-select select",
+                "br-select select"
+            ]
+
+            campo_competencia = None
+            for seletor in seletores_competencia:
+                try:
+                    elementos = await self.page.query_selector_all(seletor)
+                    for elemento in elementos:
+                        if await elemento.is_visible():
+                            # Verificar se está próximo do texto "Competência de Apuração"
+                            campo_competencia = elemento
+                            self.logger.info(f"✅ Encontrado campo de competência ({seletor})")
+                            break
+                    if campo_competencia:
+                        break
+                except:
+                    continue
+
+            if not campo_competencia:
+                # Tentar encontrar via label
+                self.logger.info("Procurando via label 'Competência de Apuração'...")
+                try:
+                    # Procurar label com texto "Competência de Apuração"
+                    label = await self.page.query_selector("label:has-text('Competência de Apuração'), label:has-text('Competência'), label:has-text('competência')")
+                    if label:
+                        # Pegar o 'for' do label
+                        for_attr = await label.get_attribute('for')
+                        if for_attr:
+                            campo_competencia = await self.page.query_selector(f"#{for_attr}")
+                            if campo_competencia:
+                                self.logger.info("✅ Encontrado campo via label")
+                except:
+                    pass
+
+            if not campo_competencia:
+                self.logger.error("❌ Não foi possível encontrar campo de 'Competência de Apuração'")
+                await self._screenshot_erro("campo_competencia_nao_encontrado")
+                return []
+
+            # Passo 4: Extrair todas as opções do select
+            self.logger.info("")
+            self.logger.info("📊 Passo 4: Extraindo competências disponíveis...")
+
+            try:
+                # Extrair opções via JavaScript
+                opcoes_info = await self.page.evaluate("""
+                    (selectElement) => {
+                        const opcoes = [];
+                        if (selectElement && selectElement.options) {
+                            for (let i = 0; i < selectElement.options.length; i++) {
+                                const option = selectElement.options[i];
+                                const texto = option.text.trim();
+                                const valor = option.value;
+
+                                // Ignorar opção vazia ou "Selecione"
+                                if (texto && valor &&
+                                    !texto.toLowerCase().includes('selecione') &&
+                                    !texto.toLowerCase().includes('escolha')) {
+                                    opcoes.push({
+                                        texto: texto,
+                                        valor: valor
+                                    });
+                                }
+                            }
+                        }
+                        return opcoes;
+                    }
+                """, campo_competencia)
+
+                if opcoes_info:
+                    self.logger.info(f"✅ Encontradas {len(opcoes_info)} competências em aberto:")
+                    for i, opcao in enumerate(opcoes_info, 1):
+                        competencias.append(opcao['texto'])
+                        self.logger.info(f"  {i}. {opcao['texto']} (valor: {opcao['valor']})")
+                else:
+                    self.logger.warning("⚠️  Nenhuma competência encontrada no select")
+
+            except Exception as e:
+                self.logger.error(f"Erro ao extrair opções: {str(e)}")
+                await self._screenshot_erro("erro_extrair_competencias")
+
+            # Salvar competências em arquivo
+            if competencias:
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    competencias_path = os.path.join(self.log_dir, f"competencias_em_aberto_{timestamp}.json")
+
+                    dados = {
+                        "timestamp": timestamp,
+                        "total": len(competencias),
+                        "competencias": competencias
+                    }
+
+                    with open(competencias_path, 'w', encoding='utf-8') as f:
+                        json.dump(dados, f, ensure_ascii=False, indent=2)
+
+                    self.logger.info(f"💾 Competências salvas em: {competencias_path}")
+                except Exception as e:
+                    self.logger.warning(f"Erro ao salvar arquivo: {str(e)}")
+
+            # Tirar screenshot da tela
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = os.path.join(self.log_dir, f"competencias_tela_{timestamp}.png")
+                await self.page.screenshot(path=screenshot_path, full_page=True)
+                self.logger.info(f"📸 Screenshot salvo: {screenshot_path}")
+            except Exception as e:
+                self.logger.warning(f"Erro ao tirar screenshot: {str(e)}")
+
+            self.logger.info("")
+            self.logger.info("=" * 70)
+            self.logger.info(f"✅ Busca de competências concluída! Total: {len(competencias)}")
+            self.logger.info("=" * 70)
+
+            return competencias
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao buscar competências: {str(e)}")
+            self.logger.exception("Traceback:")
+            await self._screenshot_erro("erro_buscar_competencias")
+            return []
+
     async def _explorar_pagina_inicial(self) -> dict:
         """
         Explora e mapeia a estrutura da página inicial após login
@@ -2430,6 +2690,22 @@ class RoboFGTS:
                 except Exception as e:
                     self.logger.warning(f"Erro ao trocar perfil para {cnpj}: {str(e)}")
                     self.logger.warning("Continuando com processamento...")
+
+            self.logger.info("")
+
+            # Buscar competências em aberto
+            try:
+                self.logger.info("")
+                competencias_encontradas = await self._buscar_competencias_em_aberto()
+
+                if competencias_encontradas:
+                    self.logger.info(f"✅ Total de competências em aberto: {len(competencias_encontradas)}")
+                else:
+                    self.logger.warning("⚠️  Nenhuma competência em aberto encontrada")
+
+            except Exception as e:
+                self.logger.warning(f"Erro ao buscar competências: {str(e)}")
+                self.logger.warning("Continuando com processamento...")
 
             self.logger.info("")
 
