@@ -1644,6 +1644,7 @@ class RoboFGTS:
                                 name: el.name || '',
                                 classe: el.className || '',
                                 label: label ? label.innerText.trim() : '',
+                                valor: el.value || '',
                                 opcoes: el.options.length,
                                 visivel: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
                             });
@@ -1652,15 +1653,17 @@ class RoboFGTS:
                         // Buscar br-select (componente Gov.br)
                         document.querySelectorAll('br-select').forEach((el, i) => {
                             const select = el.querySelector('select');
+                            const input = el.querySelector('input');
                             const label = el.closest('label') ||
                                          el.querySelector('label') ||
                                          document.querySelector(`label[for="${el.id}"]`);
                             campos.push({
                                 tipo: 'br-select',
                                 id: el.id || `br-select-${i}`,
-                                name: select ? select.name : '',
+                                name: select ? select.name : (input ? input.name : ''),
                                 classe: el.className || '',
                                 label: label ? label.innerText.trim() : '',
+                                valor: select ? select.value : (input ? input.value : ''),
                                 opcoes: select ? select.options.length : 0,
                                 visivel: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
                             });
@@ -1675,6 +1678,7 @@ class RoboFGTS:
                                 id: el.id || '',
                                 name: el.name || '',
                                 placeholder: el.placeholder || '',
+                                valor: el.value || '',
                                 label: label ? label.innerText.trim() : '',
                                 visivel: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
                             });
@@ -1685,19 +1689,23 @@ class RoboFGTS:
                 """)
 
                 self.logger.info(f"📋 Encontrados {len(elementos_form)} campos de formulário:")
-                for i, campo in enumerate(elementos_form[:20], 1):  # Mostrar primeiros 20
+                for i, campo in enumerate(elementos_form[:30], 1):  # Mostrar primeiros 30
                     visivel = "✓" if campo.get('visivel') else "✗"
                     label = campo.get('label', '')[:50]  # Truncar label longo
+                    valor = campo.get('valor', '')[:30] if campo.get('valor') else ''
                     self.logger.info(f"  {i}. [{visivel}] {campo['tipo']} - ID: {campo.get('id', 'N/A')[:30]} - Label: {label}")
+                    if valor:
+                        self.logger.info(f"      └─ Valor: {valor}")
                     if campo.get('opcoes'):
                         self.logger.info(f"      └─ {campo['opcoes']} opções disponíveis")
             except Exception as e:
                 self.logger.warning(f"Erro no debug de formulários: {str(e)}")
 
-            # Estratégia 1: Buscar por seletores diretos
+            # Estratégia 1: Buscar por seletores diretos (select E input)
             self.logger.info("")
             self.logger.info("🔍 Estratégia 1: Buscando por seletores diretos...")
             seletores_competencia = [
+                # Selects
                 "select[name*='competencia']",
                 "select[id*='competencia']",
                 "select[name*='apuracao']",
@@ -1707,24 +1715,38 @@ class RoboFGTS:
                 ".br-select select",
                 "br-select select",
                 "[data-field*='competencia'] select",
-                "[data-field*='apuracao'] select"
+                "[data-field*='apuracao'] select",
+                # Inputs
+                "input[name*='competencia']",
+                "input[id*='competencia']",
+                "input[name*='apuracao']",
+                "input[id*='apuracao']",
+                "input[id*='Competencia']",
+                "input[name*='Competencia']",
+                ".br-select input",
+                "br-select input",
+                "[data-field*='competencia'] input",
+                "[data-field*='apuracao'] input"
             ]
 
             campo_competencia = None
+            tipo_campo = None  # 'select' ou 'input'
+
             for seletor in seletores_competencia:
                 try:
                     elementos = await self.page.query_selector_all(seletor)
                     for elemento in elementos:
                         if await elemento.is_visible():
                             campo_competencia = elemento
-                            self.logger.info(f"✅ Encontrado via seletor: {seletor}")
+                            tipo_campo = 'select' if 'select' in seletor else 'input'
+                            self.logger.info(f"✅ Encontrado via seletor: {seletor} (tipo: {tipo_campo})")
                             break
                     if campo_competencia:
                         break
                 except:
                     continue
 
-            # Estratégia 2: Buscar via label
+            # Estratégia 2: Buscar via label (select ou input)
             if not campo_competencia:
                 self.logger.info("")
                 self.logger.info("🔍 Estratégia 2: Buscando via label...")
@@ -1749,19 +1771,23 @@ class RoboFGTS:
                                     campo = await self.page.query_selector(f"#{for_attr}")
                                     if campo:
                                         campo_competencia = campo
-                                        self.logger.info(f"✅ Encontrado via label: {label_sel}")
+                                        tag_name = await campo.evaluate("el => el.tagName.toLowerCase()")
+                                        tipo_campo = tag_name
+                                        self.logger.info(f"✅ Encontrado via label: {label_sel} (tipo: {tipo_campo})")
                                         break
 
-                                # Se não tem 'for', procurar select dentro ou próximo do label
-                                campo = await label.query_selector('select')
+                                # Se não tem 'for', procurar select ou input dentro ou próximo do label
+                                campo = await label.query_selector('select, input')
                                 if not campo:
-                                    # Procurar select irmão do label
+                                    # Procurar select/input irmão do label
                                     parent = await label.evaluate_handle("el => el.parentElement")
-                                    campo = await parent.query_selector('select')
+                                    campo = await parent.query_selector('select, input')
 
                                 if campo:
                                     campo_competencia = campo
-                                    self.logger.info(f"✅ Encontrado via label (elemento próximo): {label_sel}")
+                                    tag_name = await campo.evaluate("el => el.tagName.toLowerCase()")
+                                    tipo_campo = tag_name
+                                    self.logger.info(f"✅ Encontrado via label (elemento próximo): {label_sel} (tipo: {tipo_campo})")
                                     break
                         except:
                             continue
@@ -1771,46 +1797,105 @@ class RoboFGTS:
                 except Exception as e:
                     self.logger.warning(f"Erro na busca por label: {str(e)}")
 
-            # Estratégia 3: Buscar qualquer select visível na página
+            # Estratégia 3: Buscar campos por valor (MM/YYYY)
             if not campo_competencia:
                 self.logger.info("")
-                self.logger.info("🔍 Estratégia 3: Buscando qualquer select visível...")
+                self.logger.info("🔍 Estratégia 3: Buscando campos com valor no formato MM/YYYY...")
                 try:
-                    todos_selects = await self.page.query_selector_all('select')
-                    self.logger.info(f"   Encontrados {len(todos_selects)} elementos select na página")
+                    # Buscar campos que tenham valor no formato MM/YYYY (ex: 10/2025)
+                    campo_info = await self.page.evaluate("""
+                        () => {
+                            const regex = /^\\d{2}\\/\\d{4}$/; // Formato MM/YYYY
 
-                    selects_visiveis = []
-                    for select in todos_selects:
-                        if await select.is_visible():
-                            selects_visiveis.append(select)
+                            // Verificar inputs
+                            for (const input of document.querySelectorAll('input')) {
+                                if (regex.test(input.value) && (input.offsetWidth || input.offsetHeight)) {
+                                    return {
+                                        found: true,
+                                        tipo: 'input',
+                                        id: input.id,
+                                        name: input.name,
+                                        valor: input.value
+                                    };
+                                }
+                            }
 
-                    self.logger.info(f"   {len(selects_visiveis)} são visíveis")
+                            // Verificar selects
+                            for (const select of document.querySelectorAll('select')) {
+                                if (regex.test(select.value) && (select.offsetWidth || select.offsetHeight)) {
+                                    return {
+                                        found: true,
+                                        tipo: 'select',
+                                        id: select.id,
+                                        name: select.name,
+                                        valor: select.value
+                                    };
+                                }
+                            }
 
-                    if len(selects_visiveis) > 0:
-                        # Usar o primeiro select visível (assumindo que é o campo de competência)
-                        campo_competencia = selects_visiveis[0]
-                        self.logger.info("✅ Usando primeiro select visível encontrado")
+                            return { found: false };
+                        }
+                    """)
 
-                        # Logar informações sobre este select
+                    if campo_info and campo_info.get('found'):
+                        # Tentar pegar o elemento pelo ID ou name
+                        if campo_info.get('id'):
+                            campo_competencia = await self.page.query_selector(f"#{campo_info['id']}")
+                        elif campo_info.get('name'):
+                            tag = campo_info.get('tipo', 'input')
+                            campo_competencia = await self.page.query_selector(f"{tag}[name='{campo_info['name']}']")
+
+                        if campo_competencia:
+                            tipo_campo = campo_info.get('tipo')
+                            self.logger.info(f"✅ Encontrado via valor MM/YYYY: {campo_info.get('valor')} (tipo: {tipo_campo})")
+                except Exception as e:
+                    self.logger.warning(f"Erro na busca por valor: {str(e)}")
+
+            # Estratégia 4: Buscar qualquer select/input visível na página
+            if not campo_competencia:
+                self.logger.info("")
+                self.logger.info("🔍 Estratégia 4: Buscando qualquer select/input visível...")
+                try:
+                    todos_campos = await self.page.query_selector_all('select, input')
+                    self.logger.info(f"   Encontrados {len(todos_campos)} elementos na página")
+
+                    campos_visiveis = []
+                    for campo in todos_campos:
+                        if await campo.is_visible():
+                            campos_visiveis.append(campo)
+
+                    self.logger.info(f"   {len(campos_visiveis)} são visíveis")
+
+                    if len(campos_visiveis) > 0:
+                        # Usar o primeiro campo visível
+                        campo_competencia = campos_visiveis[0]
+                        tag_name = await campo_competencia.evaluate("el => el.tagName.toLowerCase()")
+                        tipo_campo = tag_name
+                        self.logger.info(f"✅ Usando primeiro campo visível encontrado (tipo: {tipo_campo})")
+
+                        # Logar informações sobre este campo
                         try:
-                            select_info = await campo_competencia.evaluate("""
+                            campo_info = await campo_competencia.evaluate("""
                                 (el) => ({
                                     id: el.id,
                                     name: el.name,
                                     className: el.className,
-                                    opcoes: el.options.length
+                                    valor: el.value,
+                                    opcoes: el.options ? el.options.length : 0
                                 })
                             """)
-                            self.logger.info(f"   ID: {select_info.get('id')}, Name: {select_info.get('name')}, Opções: {select_info.get('opcoes')}")
+                            self.logger.info(f"   ID: {campo_info.get('id')}, Name: {campo_info.get('name')}, Valor: {campo_info.get('valor')}")
+                            if campo_info.get('opcoes'):
+                                self.logger.info(f"   Opções: {campo_info.get('opcoes')}")
                         except:
                             pass
                 except Exception as e:
-                    self.logger.warning(f"Erro ao buscar selects: {str(e)}")
+                    self.logger.warning(f"Erro ao buscar campos: {str(e)}")
 
-            # Estratégia 4: JavaScript para buscar por texto próximo
+            # Estratégia 5: JavaScript para buscar por texto próximo (select ou input)
             if not campo_competencia:
                 self.logger.info("")
-                self.logger.info("🔍 Estratégia 4: Buscando via JavaScript (texto próximo)...")
+                self.logger.info("🔍 Estratégia 5: Buscando via JavaScript (texto próximo)...")
                 try:
                     campo_info = await self.page.evaluate("""
                         () => {
@@ -1824,21 +1909,22 @@ class RoboFGTS:
                                 // Se elemento contém o texto
                                 for (const busca of textos) {
                                     if (texto.includes(busca)) {
-                                        // Procurar select próximo
-                                        let select = el.querySelector('select');
-                                        if (!select && el.parentElement) {
-                                            select = el.parentElement.querySelector('select');
+                                        // Procurar select ou input próximo
+                                        let campo = el.querySelector('select, input');
+                                        if (!campo && el.parentElement) {
+                                            campo = el.parentElement.querySelector('select, input');
                                         }
-                                        if (!select && el.nextElementSibling) {
-                                            select = el.nextElementSibling.querySelector('select');
+                                        if (!campo && el.nextElementSibling) {
+                                            campo = el.nextElementSibling.querySelector('select, input');
                                         }
 
-                                        if (select && (select.offsetWidth || select.offsetHeight)) {
+                                        if (campo && (campo.offsetWidth || campo.offsetHeight)) {
                                             return {
                                                 found: true,
-                                                id: select.id,
-                                                name: select.name,
-                                                className: select.className
+                                                tipo: campo.tagName.toLowerCase(),
+                                                id: campo.id,
+                                                name: campo.name,
+                                                className: campo.className
                                             };
                                         }
                                     }
@@ -1853,59 +1939,122 @@ class RoboFGTS:
                         if campo_info.get('id'):
                             campo_competencia = await self.page.query_selector(f"#{campo_info['id']}")
                         elif campo_info.get('name'):
-                            campo_competencia = await self.page.query_selector(f"select[name='{campo_info['name']}']")
+                            tag = campo_info.get('tipo', 'input')
+                            campo_competencia = await self.page.query_selector(f"{tag}[name='{campo_info['name']}']")
 
                         if campo_competencia:
-                            self.logger.info("✅ Encontrado via JavaScript (busca por texto)")
+                            tipo_campo = campo_info.get('tipo')
+                            self.logger.info(f"✅ Encontrado via JavaScript (busca por texto) - tipo: {tipo_campo}")
                 except Exception as e:
                     self.logger.warning(f"Erro na busca JavaScript: {str(e)}")
 
             if not campo_competencia:
                 self.logger.error("❌ Não foi possível encontrar campo de 'Competência de Apuração'")
-                self.logger.error("   Todas as 4 estratégias de busca falharam")
+                self.logger.error("   Todas as 5 estratégias de busca falharam")
                 await self._screenshot_erro("campo_competencia_nao_encontrado")
                 return []
 
-            # Passo 4: Extrair todas as opções do select
+            # Passo 4: Extrair todas as opções (select ou clicar no input para abrir dropdown)
             self.logger.info("")
             self.logger.info("📊 Passo 4: Extraindo competências disponíveis...")
 
             try:
-                # Extrair opções via JavaScript
-                opcoes_info = await self.page.evaluate("""
-                    (selectElement) => {
-                        const opcoes = [];
-                        if (selectElement && selectElement.options) {
-                            for (let i = 0; i < selectElement.options.length; i++) {
-                                const option = selectElement.options[i];
-                                const texto = option.text.trim();
-                                const valor = option.value;
+                # Descobrir se é select ou input
+                tag_name = await campo_competencia.evaluate("el => el.tagName.toLowerCase()")
+                self.logger.info(f"   Tipo de campo encontrado: {tag_name}")
 
-                                // Ignorar opção vazia ou "Selecione"
-                                if (texto && valor &&
-                                    !texto.toLowerCase().includes('selecione') &&
-                                    !texto.toLowerCase().includes('escolha')) {
-                                    opcoes.push({
-                                        texto: texto,
-                                        valor: valor
-                                    });
+                if tag_name == 'select':
+                    # É um select, extrair opções diretamente
+                    self.logger.info("   Extraindo opções do select...")
+                    opcoes_info = await self.page.evaluate("""
+                        (selectElement) => {
+                            const opcoes = [];
+                            if (selectElement && selectElement.options) {
+                                for (let i = 0; i < selectElement.options.length; i++) {
+                                    const option = selectElement.options[i];
+                                    const texto = option.text.trim();
+                                    const valor = option.value;
+
+                                    // Ignorar opção vazia ou "Selecione"
+                                    if (texto && valor &&
+                                        !texto.toLowerCase().includes('selecione') &&
+                                        !texto.toLowerCase().includes('escolha')) {
+                                        opcoes.push({
+                                            texto: texto,
+                                            valor: valor
+                                        });
+                                    }
                                 }
                             }
+                            return opcoes;
                         }
-                        return opcoes;
-                    }
-                """, campo_competencia)
+                    """, campo_competencia)
 
-                if opcoes_info:
-                    self.logger.info(f"✅ Encontradas {len(opcoes_info)} competências em aberto:")
-                    for i, opcao in enumerate(opcoes_info, 1):
-                        competencias.append(opcao['texto'])
-                        self.logger.info(f"  {i}. {opcao['texto']} (valor: {opcao['valor']})")
-                else:
-                    self.logger.warning("⚠️  Nenhuma competência encontrada no select")
+                    if opcoes_info:
+                        self.logger.info(f"✅ Encontradas {len(opcoes_info)} competências em aberto:")
+                        for i, opcao in enumerate(opcoes_info, 1):
+                            competencias.append(opcao['texto'])
+                            self.logger.info(f"  {i}. {opcao['texto']} (valor: {opcao['valor']})")
+                    else:
+                        self.logger.warning("⚠️  Nenhuma competência encontrada no select")
+
+                elif tag_name == 'input':
+                    # É um input, clicar para ver se abre dropdown/datepicker
+                    self.logger.info("   Campo é INPUT. Tentando clicar para abrir dropdown...")
+
+                    # Clicar no campo
+                    await campo_competencia.click()
+                    await asyncio.sleep(1)
+
+                    # Procurar dropdown que possa ter aparecido
+                    self.logger.info("   Procurando dropdown/datepicker aberto...")
+
+                    # Tentar encontrar lista de opções (ul, div com opções, etc)
+                    opcoes_dropdowns = await self.page.evaluate("""
+                        () => {
+                            const opcoes = [];
+
+                            // Procurar listas que podem conter competências
+                            const listas = document.querySelectorAll('ul, ol, .dropdown, .menu, .options, [role="listbox"]');
+
+                            for (const lista of listas) {
+                                // Verificar se lista está visível
+                                if (!(lista.offsetWidth || lista.offsetHeight)) continue;
+
+                                // Pegar itens da lista
+                                const itens = lista.querySelectorAll('li, .item, .option, [role="option"]');
+                                for (const item of itens) {
+                                    const texto = item.innerText.trim();
+                                    if (texto) {
+                                        opcoes.push(texto);
+                                    }
+                                }
+
+                                if (opcoes.length > 0) break; // Encontrou opções, sair
+                            }
+
+                            return opcoes;
+                        }
+                    """)
+
+                    if opcoes_dropdowns and len(opcoes_dropdowns) > 0:
+                        self.logger.info(f"✅ Encontradas {len(opcoes_dropdowns)} competências em aberto:")
+                        for i, opcao in enumerate(opcoes_dropdowns, 1):
+                            competencias.append(opcao)
+                            self.logger.info(f"  {i}. {opcao}")
+                    else:
+                        # Não encontrou dropdown aberto, tentar pegar valor atual do input
+                        self.logger.warning("   Não foi possível encontrar dropdown. Extraindo valor atual do campo...")
+                        valor_atual = await campo_competencia.evaluate("el => el.value")
+                        if valor_atual:
+                            competencias.append(valor_atual)
+                            self.logger.info(f"   Valor atual: {valor_atual}")
+                        else:
+                            self.logger.warning("⚠️  Campo está vazio e dropdown não foi encontrado")
 
             except Exception as e:
                 self.logger.error(f"Erro ao extrair opções: {str(e)}")
+                self.logger.exception("Traceback:")
                 await self._screenshot_erro("erro_extrair_competencias")
 
             # Salvar competências em arquivo
