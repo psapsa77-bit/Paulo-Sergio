@@ -935,6 +935,269 @@ class RoboFGTS:
             await self._screenshot_erro("login_erro_critico")
             return False
 
+    async def _fechar_popups(self) -> bool:
+        """
+        Detecta e fecha pop-ups, modais e avisos que aparecem após login
+
+        Returns:
+            bool: True se processou (fechou ou não havia pop-ups)
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("🔍 Verificando pop-ups, modais e avisos...")
+            self.logger.info("=" * 70)
+
+            await asyncio.sleep(2)  # Aguardar pop-ups aparecerem
+
+            # Lista de seletores comuns de pop-ups/modais
+            seletores_popup = [
+                # Botões de fechar (X)
+                "button[aria-label='Close']",
+                "button[aria-label='Fechar']",
+                "button.close",
+                "button.modal-close",
+                "[data-dismiss='modal']",
+                ".modal-header .close",
+
+                # Botões de OK/Entendi/Continuar
+                "button:has-text('OK')",
+                "button:has-text('Entendi')",
+                "button:has-text('Continuar')",
+                "button:has-text('Aceitar')",
+                "button:has-text('Concordo')",
+
+                # Overlays/modais
+                ".modal.show button",
+                ".popup button",
+                ".dialog button",
+                "[role='dialog'] button"
+            ]
+
+            popups_fechados = 0
+
+            for seletor in seletores_popup:
+                try:
+                    # Tentar encontrar elemento (não aguardar muito)
+                    elementos = await self.page.query_selector_all(seletor)
+
+                    for elemento in elementos:
+                        # Verificar se elemento está visível
+                        is_visible = await elemento.is_visible()
+                        if is_visible:
+                            texto = await elemento.inner_text()
+                            self.logger.info(f"Encontrado pop-up/modal: '{texto[:50]}' (seletor: {seletor})")
+
+                            # Tentar clicar
+                            await elemento.click()
+                            popups_fechados += 1
+                            self.logger.info(f"✓ Pop-up fechado: '{texto[:50]}'")
+                            await asyncio.sleep(1)
+
+                except Exception as e:
+                    # Ignorar erros (elemento pode não existir ou desaparecer)
+                    continue
+
+            if popups_fechados > 0:
+                self.logger.info(f"✓ Total de pop-ups fechados: {popups_fechados}")
+            else:
+                self.logger.info("✓ Nenhum pop-up detectado")
+
+            return True
+
+        except Exception as e:
+            self.logger.warning(f"Erro ao verificar pop-ups: {str(e)}")
+            return True  # Não bloquear por causa disso
+
+    async def _explorar_pagina_inicial(self) -> dict:
+        """
+        Explora e mapeia a estrutura da página inicial após login
+
+        Returns:
+            dict: Informações sobre a estrutura da página
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("🗺️  EXPLORANDO ESTRUTURA DO SITE...")
+            self.logger.info("=" * 70)
+
+            await asyncio.sleep(2)
+
+            info = {
+                "url": self.page.url,
+                "titulo": await self.page.title(),
+                "menus": [],
+                "links": [],
+                "botoes": [],
+                "tabelas": [],
+                "formularios": []
+            }
+
+            self.logger.info(f"📍 URL atual: {info['url']}")
+            self.logger.info(f"📄 Título: {info['titulo']}")
+            self.logger.info("")
+
+            # 1. MAPEAR MENUS E NAVEGAÇÃO
+            self.logger.info("🔍 Mapeando menus de navegação...")
+            menus = await self.page.evaluate("""
+                () => {
+                    const menus = [];
+                    const nav = document.querySelectorAll('nav a, nav button, [role="navigation"] a');
+                    nav.forEach((el, index) => {
+                        if (el.innerText && el.innerText.trim()) {
+                            menus.push({
+                                texto: el.innerText.trim().substring(0, 50),
+                                href: el.href || '',
+                                id: el.id || '',
+                                class: el.className || ''
+                            });
+                        }
+                    });
+                    return menus.slice(0, 20);  // Limitar a 20 itens
+                }
+            """)
+            info["menus"] = menus
+
+            if menus:
+                self.logger.info(f"✓ Encontrados {len(menus)} itens de menu:")
+                for i, menu in enumerate(menus[:10], 1):
+                    self.logger.info(f"  {i}. {menu['texto']}")
+                if len(menus) > 10:
+                    self.logger.info(f"  ... e mais {len(menus) - 10} itens")
+            else:
+                self.logger.info("⚠️  Nenhum menu encontrado")
+
+            self.logger.info("")
+
+            # 2. MAPEAR LINKS PRINCIPAIS
+            self.logger.info("🔍 Mapeando links principais...")
+            links = await self.page.evaluate("""
+                () => {
+                    const links = [];
+                    const principais = document.querySelectorAll('main a, .content a, #content a');
+                    principais.forEach((el) => {
+                        if (el.innerText && el.innerText.trim() && el.href) {
+                            links.push({
+                                texto: el.innerText.trim().substring(0, 50),
+                                href: el.href
+                            });
+                        }
+                    });
+                    return links.slice(0, 15);
+                }
+            """)
+            info["links"] = links
+
+            if links:
+                self.logger.info(f"✓ Encontrados {len(links)} links:")
+                for i, link in enumerate(links[:10], 1):
+                    self.logger.info(f"  {i}. {link['texto']} → {link['href']}")
+            else:
+                self.logger.info("⚠️  Nenhum link principal encontrado")
+
+            self.logger.info("")
+
+            # 3. MAPEAR BOTÕES
+            self.logger.info("🔍 Mapeando botões...")
+            botoes = await self.page.evaluate("""
+                () => {
+                    const botoes = [];
+                    document.querySelectorAll('button, [role="button"]').forEach((btn) => {
+                        if (btn.innerText && btn.innerText.trim()) {
+                            botoes.push({
+                                texto: btn.innerText.trim().substring(0, 50),
+                                id: btn.id || '',
+                                class: btn.className || '',
+                                type: btn.type || ''
+                            });
+                        }
+                    });
+                    return botoes.slice(0, 15);
+                }
+            """)
+            info["botoes"] = botoes
+
+            if botoes:
+                self.logger.info(f"✓ Encontrados {len(botoes)} botões:")
+                for i, btn in enumerate(botoes[:10], 1):
+                    self.logger.info(f"  {i}. {btn['texto']}")
+            else:
+                self.logger.info("⚠️  Nenhum botão encontrado")
+
+            self.logger.info("")
+
+            # 4. MAPEAR TABELAS
+            self.logger.info("🔍 Procurando tabelas de dados...")
+            tabelas = await self.page.evaluate("""
+                () => {
+                    const tabelas = [];
+                    document.querySelectorAll('table').forEach((table, index) => {
+                        const headers = Array.from(table.querySelectorAll('th')).map(th => th.innerText.trim());
+                        const rows = table.querySelectorAll('tbody tr').length;
+
+                        if (headers.length > 0 || rows > 0) {
+                            tabelas.push({
+                                index: index,
+                                headers: headers.slice(0, 10),
+                                rows: rows,
+                                id: table.id || '',
+                                class: table.className || ''
+                            });
+                        }
+                    });
+                    return tabelas;
+                }
+            """)
+            info["tabelas"] = tabelas
+
+            if tabelas:
+                self.logger.info(f"✓ Encontradas {len(tabelas)} tabelas:")
+                for i, tab in enumerate(tabelas, 1):
+                    self.logger.info(f"  {i}. Tabela com {tab['rows']} linhas")
+                    if tab['headers']:
+                        self.logger.info(f"     Colunas: {', '.join(tab['headers'])}")
+            else:
+                self.logger.info("⚠️  Nenhuma tabela encontrada")
+
+            self.logger.info("")
+
+            # 5. PROCURAR PALAVRAS-CHAVE RELACIONADAS A FGTS/GUIAS
+            self.logger.info("🔍 Procurando seções relacionadas a FGTS...")
+            palavras_chave = await self.page.evaluate("""
+                () => {
+                    const texto = document.body.innerText;
+                    const keywords = {
+                        'guias': (texto.match(/guias?/gi) || []).length,
+                        'fgts': (texto.match(/fgts/gi) || []).length,
+                        'competência': (texto.match(/competência/gi) || []).length,
+                        'boleto': (texto.match(/boletos?/gi) || []).length,
+                        'pagamento': (texto.match(/pagamentos?/gi) || []).length,
+                        'empresa': (texto.match(/empresas?/gi) || []).length,
+                        'cnpj': (texto.match(/cnpj/gi) || []).length
+                    };
+                    return keywords;
+                }
+            """)
+
+            encontradas = [k for k, v in palavras_chave.items() if v > 0]
+            if encontradas:
+                self.logger.info("✓ Palavras-chave encontradas:")
+                for palavra, count in palavras_chave.items():
+                    if count > 0:
+                        self.logger.info(f"  - '{palavra}': {count} ocorrências")
+            else:
+                self.logger.info("⚠️  Nenhuma palavra-chave específica encontrada")
+
+            self.logger.info("")
+            self.logger.info("=" * 70)
+            self.logger.info("✓ Exploração concluída!")
+            self.logger.info("=" * 70)
+
+            return info
+
+        except Exception as e:
+            self.logger.error(f"Erro ao explorar página: {str(e)}")
+            return {}
+
     async def _selecionar_empresa(self, cnpj: str) -> bool:
         """
         Seleciona uma empresa específica
@@ -1214,6 +1477,36 @@ class RoboFGTS:
                 self.logger.error(f"❌ Erro durante login: {str(e)}")
                 self.logger.exception("Traceback completo:")
                 return False
+
+            # ============================================================
+            # EXPLORAÇÃO: Fechar pop-ups e mapear estrutura do site
+            # ============================================================
+            self.logger.info("")
+            self.logger.info("Etapa 3.5/4: Explorando site após login...")
+
+            # Fechar pop-ups/modais que possam ter aparecido
+            try:
+                await self._fechar_popups()
+            except Exception as e:
+                self.logger.warning(f"Erro ao fechar pop-ups: {str(e)}")
+
+            # Explorar estrutura da página
+            try:
+                info_site = await self._explorar_pagina_inicial()
+
+                # Salvar informações de exploração em arquivo JSON
+                if info_site:
+                    import json
+                    exploracao_path = config.LOGS_DIR / f"exploracao_site_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    with open(exploracao_path, 'w', encoding='utf-8') as f:
+                        json.dump(info_site, f, indent=2, ensure_ascii=False)
+                    self.logger.info(f"📄 Informações de exploração salvas em: {exploracao_path}")
+
+            except Exception as e:
+                self.logger.warning(f"Erro durante exploração: {str(e)}")
+                self.logger.warning("Continuando com processamento...")
+
+            self.logger.info("")
 
             # Processar cada empresa
             self.logger.info("Etapa 4/4: Processando empresas...")
