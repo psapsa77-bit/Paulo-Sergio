@@ -802,18 +802,16 @@ class RoboFGTS:
             self.logger.info("Verificando se há navegação inicial necessária...")
             await self._navegar_tela_inicial()
 
-            # Verificar e resolver CAPTCHA (se houver)
-            if not await self._lidar_com_captcha():
-                self.logger.error("Falha ao resolver CAPTCHA na tela inicial")
-                await self._screenshot_erro("captcha_nao_resolvido_inicial")
-                return False
+            # Aguardar um pouco para página processar
+            self.logger.debug("Aguardando página processar...")
+            await asyncio.sleep(2)
 
-            # Aguardar um pouco mais para página processar após CAPTCHA
-            self.logger.debug("Aguardando página processar após CAPTCHA...")
-            await asyncio.sleep(3)
-
-            # Clicar no botão de certificado digital
-            self.logger.info("Procurando botão de certificado digital...")
+            # ========================================================================
+            # PASSO 1: PROCURAR E CLICAR NO BOTÃO DE CERTIFICADO DIGITAL
+            # ========================================================================
+            self.logger.info("=" * 70)
+            self.logger.info("PASSO 1: Procurando botão de certificado digital...")
+            self.logger.info("=" * 70)
             self.logger.debug(f"Seletores a serem tentados: {config.SELECTORS['login']['btn_certificado']}")
 
             # Logar URL atual antes de procurar botão
@@ -824,7 +822,7 @@ class RoboFGTS:
                 self.logger.error("❌ Botão de certificado digital não encontrado na página")
                 self.logger.error("Possíveis causas:")
                 self.logger.error("  1. A estrutura do site mudou")
-                self.logger.error("  2. Ainda está na tela de CAPTCHA")
+                self.logger.error("  2. Ainda está em uma tela anterior")
                 self.logger.error("  3. Já passou da tela de login")
                 self.logger.error("  4. Portal FGTS está fora do ar ou URL incorreta")
 
@@ -859,27 +857,56 @@ class RoboFGTS:
 
                 return False
 
-            # Aguardar seleção de certificado (pode ser automática)
-            self.logger.info("Aguardando seleção de certificado...")
+            self.logger.info("✓ Botão de certificado digital clicado com sucesso!")
+
+            # ========================================================================
+            # PASSO 2: VERIFICAR SE APARECEU CAPTCHA OU SELEÇÃO DE CERTIFICADO
+            # ========================================================================
+            self.logger.info("=" * 70)
+            self.logger.info("PASSO 2: Verificando o que apareceu após clicar no botão...")
+            self.logger.info("=" * 70)
+
+            # Aguardar um pouco para a página processar o clique
             await asyncio.sleep(3)
 
+            # Verificar se há CAPTCHA
+            self.logger.info("Verificando se há CAPTCHA...")
+            if not await self._lidar_com_captcha():
+                self.logger.error("Falha ao resolver CAPTCHA após clicar no botão")
+                await self._screenshot_erro("captcha_apos_botao")
+                # Continuar mesmo assim
+                self.logger.warning("Continuando mesmo com problema no CAPTCHA...")
+
+            # Aguardar seleção de certificado
+            # O Chrome/Edge abrirá uma janela popup pedindo para selecionar o certificado
+            self.logger.info("=" * 70)
+            self.logger.info("⏳ AGUARDANDO SELEÇÃO DE CERTIFICADO")
+            self.logger.info("=" * 70)
+            self.logger.info("📌 Se uma janela popup aparecer, selecione seu certificado e clique em OK")
+            self.logger.info("📌 Se estiver usando Chrome/Edge, o certificado deve aparecer automaticamente")
+            self.logger.info("=" * 70)
+
+            await asyncio.sleep(5)  # Tempo para usuário selecionar certificado se necessário
+
             # Verificar se houve seleção de certificado no navegador
-            # (Em alguns casos, o navegador abre uma janela de seleção)
             await self._delay_aleatorio()
 
-            # Clicar em entrar
-            self.logger.info("Tentando fazer login...")
+            # ========================================================================
+            # PASSO 3: CLICAR EM ENTRAR (SE NECESSÁRIO)
+            # ========================================================================
+            self.logger.info("Tentando clicar em 'Entrar' (se houver botão)...")
             if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_entrar"]):
-                self.logger.warning("Botão 'Entrar' não encontrado - pode ter entrado automaticamente")
+                self.logger.info("✓ Botão 'Entrar' não encontrado - login pode ter sido automático")
 
             # Aguardar carregamento da página inicial
             await asyncio.sleep(3)
 
-            # Verificar e resolver CAPTCHA após login (se houver)
+            # ========================================================================
+            # PASSO 4: VERIFICAR SE HÁ CAPTCHA APÓS AUTENTICAÇÃO
+            # ========================================================================
+            self.logger.info("Verificando se há CAPTCHA após autenticação...")
             if not await self._lidar_com_captcha():
-                self.logger.error("Falha ao resolver CAPTCHA após autenticação")
-                await self._screenshot_erro("captcha_nao_resolvido_pos_login")
-                return False
+                self.logger.warning("Problema ao verificar CAPTCHA pós-login, mas continuando...")
 
             # Verificar se login foi bem-sucedido (procurar elemento da página logada)
             try:
