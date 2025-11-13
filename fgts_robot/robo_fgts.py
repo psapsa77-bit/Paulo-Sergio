@@ -1256,81 +1256,114 @@ class RoboFGTS:
                 return False
 
             # Aguardar pop-up aparecer
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
-            # Passo 2: Selecionar opção "Procurador"
+            # Passo 2: PRIMEIRA LINHA - Selecionar "Procurador" em dropdown/select
             self.logger.info("")
-            self.logger.info("🔍 Procurando opção 'Procurador' no pop-up...")
+            self.logger.info("🔍 PRIMEIRA LINHA: Procurando dropdown para selecionar 'Procurador'...")
 
-            seletores_procurador = [
-                # Radio buttons
-                "input[type='radio'][value*='procurador']",
-                "input[type='radio'][value*='PROCURADOR']",
-                "input[type='radio'][id*='procurador']",
-
-                # Labels
-                "label:has-text('Procurador')",
-                "label:has-text('Sou Procurador')",
-
-                # Divs/spans clicáveis
-                "div:has-text('Procurador')",
-                "span:has-text('Procurador')",
-
-                # Select options
-                "select option:has-text('Procurador')"
+            # Primeiro, tentar encontrar e clicar no select/dropdown
+            seletores_dropdown = [
+                "select",
+                "select[name*='perfil']",
+                "select[name*='tipo']",
+                "select[id*='perfil']",
+                "select[id*='tipo']",
+                ".br-select select",
+                "br-select select"
             ]
 
             selecionou_procurador = False
 
-            # Primeiro tentar radio buttons
-            for seletor in seletores_procurador[:3]:
+            # Tentar selecionar via select normal
+            for seletor in seletores_dropdown:
                 try:
-                    elemento = await self.page.query_selector(seletor)
-                    if elemento:
-                        await elemento.click()
+                    select_element = await self.page.query_selector(seletor)
+                    if select_element and await select_element.is_visible():
+                        # Selecionar a opção "Procurador"
+                        await select_element.select_option(label="Procurador")
                         selecionou_procurador = True
-                        self.logger.info("✅ Selecionado 'Procurador' (radio button)")
+                        self.logger.info("✅ Selecionado 'Procurador' no dropdown (via label)")
                         break
                 except:
-                    continue
-
-            # Se não encontrou radio, tentar labels e divs
-            if not selecionou_procurador:
-                for seletor in seletores_procurador[3:]:
+                    # Tentar por value
                     try:
-                        elemento = await self.page.query_selector(seletor)
-                        if elemento and await elemento.is_visible():
-                            await elemento.click()
-                            selecionou_procurador = True
-                            self.logger.info(f"✅ Clicado em 'Procurador' ({seletor})")
-                            break
+                        await select_element.select_option(value="procurador")
+                        selecionou_procurador = True
+                        self.logger.info("✅ Selecionado 'Procurador' no dropdown (via value)")
+                        break
                     except:
                         continue
 
-            # Tentar via JavaScript como fallback
+            # Se não conseguiu com select, tentar clicar no dropdown primeiro
+            if not selecionou_procurador:
+                self.logger.info("Tentando clicar no dropdown primeiro...")
+                try:
+                    # Procurar por elementos que parecem dropdowns
+                    dropdown_clicaveis = [
+                        ".br-select",
+                        "br-select",
+                        "[class*='select']",
+                        "[class*='dropdown']"
+                    ]
+
+                    for seletor in dropdown_clicaveis:
+                        try:
+                            elemento = await self.page.query_selector(seletor)
+                            if elemento and await elemento.is_visible():
+                                await elemento.click()
+                                await asyncio.sleep(1)
+
+                                # Agora tentar selecionar "Procurador" na lista que abriu
+                                opcoes = [
+                                    "text='Procurador'",
+                                    "text='procurador'",
+                                    "[data-value*='procurador']",
+                                    "li:has-text('Procurador')",
+                                    ".option:has-text('Procurador')"
+                                ]
+
+                                for opcao in opcoes:
+                                    try:
+                                        opcao_elem = await self.page.query_selector(opcao)
+                                        if opcao_elem and await opcao_elem.is_visible():
+                                            await opcao_elem.click()
+                                            selecionou_procurador = True
+                                            self.logger.info("✅ Selecionado 'Procurador' após clicar no dropdown")
+                                            break
+                                    except:
+                                        continue
+
+                                if selecionou_procurador:
+                                    break
+                        except:
+                            continue
+                except Exception as e:
+                    self.logger.debug(f"Erro ao tentar dropdown clicável: {str(e)}")
+
+            # Fallback via JavaScript
             if not selecionou_procurador:
                 self.logger.info("Tentando selecionar 'Procurador' via JavaScript...")
                 resultado = await self.page.evaluate("""
                     () => {
-                        // Tentar radio buttons
-                        const radios = document.querySelectorAll('input[type="radio"]');
-                        for (const radio of radios) {
-                            const label = radio.labels ? radio.labels[0] : null;
-                            const labelText = label ? label.innerText.toLowerCase() : '';
-                            const value = (radio.value || '').toLowerCase();
-
-                            if (labelText.includes('procurador') || value.includes('procurador')) {
-                                radio.click();
-                                return { success: true, tipo: 'radio', texto: labelText || value };
+                        // Tentar selects
+                        const selects = document.querySelectorAll('select');
+                        for (const select of selects) {
+                            for (const option of select.options) {
+                                if (option.text.toLowerCase().includes('procurador')) {
+                                    select.value = option.value;
+                                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                                    return { success: true, tipo: 'select', texto: option.text };
+                                }
                             }
                         }
 
-                        // Tentar labels
-                        const labels = document.querySelectorAll('label');
-                        for (const label of labels) {
-                            if (label.innerText.toLowerCase().includes('procurador')) {
-                                label.click();
-                                return { success: true, tipo: 'label', texto: label.innerText };
+                        // Tentar clicar em opção visível
+                        const opcoes = document.querySelectorAll('li, .option, [role="option"]');
+                        for (const opcao of opcoes) {
+                            if (opcao.innerText.toLowerCase().includes('procurador')) {
+                                opcao.click();
+                                return { success: true, tipo: 'option', texto: opcao.innerText };
                             }
                         }
 
@@ -1343,14 +1376,15 @@ class RoboFGTS:
                     self.logger.info(f"✅ Selecionado via JavaScript: {resultado.get('texto')}")
 
             if not selecionou_procurador:
-                self.logger.warning("⚠️  Não foi possível selecionar 'Procurador'")
-                await self._screenshot_erro("procurador_nao_encontrado")
+                self.logger.error("❌ Não foi possível selecionar 'Procurador' na primeira linha")
+                await self._screenshot_erro("procurador_dropdown_nao_encontrado")
+                return False
 
             await asyncio.sleep(1)
 
-            # Passo 3: Digitar CNPJ no campo
+            # Passo 3: SEGUNDA LINHA - Digitar CNPJ no campo
             self.logger.info("")
-            self.logger.info(f"🔍 Procurando campo para digitar CNPJ: {cnpj}")
+            self.logger.info(f"🔍 SEGUNDA LINHA: Procurando campo para digitar CNPJ: {cnpj}")
 
             seletores_cnpj = [
                 "input[name*='cnpj']",
@@ -1359,7 +1393,8 @@ class RoboFGTS:
                 "input[placeholder*='cnpj']",
                 "input[type='text'][name*='empresa']",
                 "input[type='text'][id*='empresa']",
-                "input[type='text']"  # Último recurso: qualquer input text
+                "input[type='text']",  # Segundo input text (após o select)
+                "input[type='number']"
             ]
 
             digitou_cnpj = False
@@ -1374,7 +1409,7 @@ class RoboFGTS:
                             # Digitar CNPJ
                             await elemento.fill(cnpj)
                             digitou_cnpj = True
-                            self.logger.info(f"✅ CNPJ digitado: {cnpj}")
+                            self.logger.info(f"✅ CNPJ digitado na segunda linha: {cnpj}")
                             break
                     if digitou_cnpj:
                         break
@@ -1382,48 +1417,50 @@ class RoboFGTS:
                     continue
 
             if not digitou_cnpj:
-                self.logger.error("❌ Não foi possível encontrar campo para digitar CNPJ")
+                self.logger.error("❌ Não foi possível encontrar campo para digitar CNPJ na segunda linha")
                 await self._screenshot_erro("campo_cnpj_nao_encontrado")
                 return False
 
             await asyncio.sleep(1)
 
-            # Passo 4: Clicar em confirmar/definir/ok
+            # Passo 4: Clicar em "Selecionar"
             self.logger.info("")
-            self.logger.info("🔍 Procurando botão de confirmação...")
+            self.logger.info("🔍 Procurando botão 'Selecionar'...")
 
-            seletores_confirmar = [
-                "button:has-text('Definir')",
-                "button:has-text('Confirmar')",
-                "button:has-text('OK')",
-                "button:has-text('Acessar')",
-                "button:has-text('Continuar')",
+            seletores_selecionar = [
+                "button:has-text('Selecionar')",
+                "button:has-text('selecionar')",
+                "a:has-text('Selecionar')",
+                "input[value='Selecionar']",
+                "button:has-text('Definir')",  # Fallback
+                "button:has-text('Confirmar')",  # Fallback
                 "button[type='submit']"
             ]
 
-            confirmou = False
+            selecionado = False
 
-            for seletor in seletores_confirmar:
+            for seletor in seletores_selecionar:
                 try:
                     elemento = await self.page.query_selector(seletor)
                     if elemento and await elemento.is_visible():
-                        texto = await elemento.inner_text()
+                        texto = await elemento.inner_text() if hasattr(elemento, 'inner_text') else await elemento.get_attribute('value')
                         await elemento.click()
-                        confirmou = True
-                        self.logger.info(f"✅ Clicado em '{texto.strip()}'!")
+                        selecionado = True
+                        self.logger.info(f"✅ Clicado em '{texto}'!")
                         break
                 except:
                     continue
 
-            if not confirmou:
+            if not selecionado:
                 # Tentar via JavaScript
+                self.logger.info("Tentando clicar em 'Selecionar' via JavaScript...")
                 resultado = await self.page.evaluate("""
                     () => {
-                        const botoes = document.querySelectorAll('button, input[type="submit"]');
+                        const botoes = document.querySelectorAll('button, input[type="submit"], a');
                         for (const btn of botoes) {
                             const texto = (btn.innerText || btn.value || '').toLowerCase();
-                            if (texto.includes('definir') || texto.includes('confirmar') ||
-                                texto.includes('ok') || texto.includes('acessar')) {
+                            if (texto.includes('selecionar') || texto.includes('definir') ||
+                                texto.includes('confirmar') || texto.includes('ok')) {
                                 btn.click();
                                 return { success: true, texto: btn.innerText || btn.value };
                             }
@@ -1433,12 +1470,12 @@ class RoboFGTS:
                 """)
 
                 if resultado.get('success'):
-                    confirmou = True
-                    self.logger.info(f"✅ Confirmado via JavaScript: {resultado.get('texto')}")
+                    selecionado = True
+                    self.logger.info(f"✅ Clicado via JavaScript: {resultado.get('texto')}")
 
-            if not confirmou:
-                self.logger.warning("⚠️  Não foi possível clicar em botão de confirmação")
-                await self._screenshot_erro("confirmar_nao_encontrado")
+            if not selecionado:
+                self.logger.error("❌ Não foi possível clicar em botão 'Selecionar'")
+                await self._screenshot_erro("selecionar_nao_encontrado")
 
             # Aguardar carregamento
             await asyncio.sleep(3)
@@ -2372,13 +2409,14 @@ class RoboFGTS:
                 self.logger.warning("Continuando com processamento...")
 
             # Explorar navegação completa (clicar em todos os botões)
-            try:
-                self.logger.info("")
-                navegacao = await self._explorar_navegacao_completa()
-
-            except Exception as e:
-                self.logger.warning(f"Erro durante exploração de navegação: {str(e)}")
-                self.logger.warning("Continuando com processamento...")
+            # DESABILITADO TEMPORARIAMENTE - Focando em trocar perfil
+            # try:
+            #     self.logger.info("")
+            #     navegacao = await self._explorar_navegacao_completa()
+            #
+            # except Exception as e:
+            #     self.logger.warning(f"Erro durante exploração de navegação: {str(e)}")
+            #     self.logger.warning("Continuando com processamento...")
 
             self.logger.info("")
 
