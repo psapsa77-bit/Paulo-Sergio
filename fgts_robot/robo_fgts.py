@@ -4,6 +4,7 @@ Classe principal do Robô de Automação FGTS Digital
 import asyncio
 import logging
 import random
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -683,4 +684,16 @@ class RoboFGTS:
         Returns:
             bool: True se processamento bem-sucedido
         """
+        # Fix para Windows com Python 3.8+
+        # O Playwright precisa do ProactorEventLoop no Windows para suportar subprocessos
+        if sys.platform == 'win32':
+            # Python 3.8+ no Windows: usar ProactorEventLoop
+            try:
+                # Configurar event loop policy para Windows
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                self.logger.debug("ProactorEventLoop configurado para Windows")
+            except AttributeError:
+                # Python < 3.8 ou não Windows
+                pass
+
         return asyncio.run(self.processar_clientes_async(lista_cnpj))
