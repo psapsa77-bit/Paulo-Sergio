@@ -126,10 +126,35 @@ class RoboFGTS:
         """
         try:
             from cryptography.hazmat.primitives import serialization
+            from cryptography import x509
 
             # Caminhos dos arquivos temporários
             temp_cert_path = config.CERT_DIR / "temp_cert.pem"
             temp_key_path = config.CERT_DIR / "temp_key.pem"
+
+            # Obter informações do certificado
+            cert_subject = self._cert_certificate.subject
+            cert_issuer = self._cert_certificate.issuer
+            cert_not_before = self._cert_certificate.not_valid_before
+            cert_not_after = self._cert_certificate.not_valid_after
+
+            self.logger.info("Informações do certificado:")
+            self.logger.info(f"  - Titular: {cert_subject.rfc4514_string()}")
+            self.logger.info(f"  - Emissor: {cert_issuer.rfc4514_string()}")
+            self.logger.info(f"  - Válido de: {cert_not_before}")
+            self.logger.info(f"  - Válido até: {cert_not_after}")
+
+            # Verificar validade
+            from datetime import datetime
+            now = datetime.now()
+            if now < cert_not_before:
+                self.logger.warning(f"⚠️ Certificado ainda não é válido! Inicia em {cert_not_before}")
+            elif now > cert_not_after:
+                self.logger.error(f"❌ Certificado expirado! Validade: {cert_not_after}")
+                raise ValueError("Certificado digital está expirado!")
+            else:
+                dias_restantes = (cert_not_after - now).days
+                self.logger.info(f"  - Status: ✓ Válido ({dias_restantes} dias restantes)")
 
             # Escrever certificado em formato PEM
             cert_pem = self._cert_certificate.public_bytes(
@@ -147,13 +172,23 @@ class RoboFGTS:
             with open(temp_key_path, 'wb') as f:
                 f.write(key_pem)
 
-            self.logger.debug(f"Certificado PEM criado: {temp_cert_path}")
-            self.logger.debug(f"Chave PEM criada: {temp_key_path}")
+            # Verificar se arquivos foram criados
+            if not temp_cert_path.exists():
+                raise FileNotFoundError(f"Falha ao criar certificado PEM: {temp_cert_path}")
+            if not temp_key_path.exists():
+                raise FileNotFoundError(f"Falha ao criar chave PEM: {temp_key_path}")
+
+            cert_size = temp_cert_path.stat().st_size
+            key_size = temp_key_path.stat().st_size
+
+            self.logger.info(f"Arquivos PEM criados:")
+            self.logger.info(f"  - Certificado: {temp_cert_path} ({cert_size} bytes)")
+            self.logger.info(f"  - Chave: {temp_key_path} ({key_size} bytes)")
 
             return str(temp_cert_path), str(temp_key_path)
 
         except Exception as e:
-            self.logger.error(f"Erro ao preparar certificado PEM: {str(e)}")
+            self.logger.error(f"❌ Erro ao preparar certificado PEM: {str(e)}")
             raise
 
     def _limpar_certificados_temporarios(self):
@@ -190,22 +225,46 @@ class RoboFGTS:
             )
 
             # Preparar certificado em formato PEM (Playwright precisa de cert + key separados)
-            self.logger.debug("Convertendo certificado .pfx para formato PEM...")
+            self.logger.info("Convertendo certificado .pfx para formato PEM...")
             cert_path, key_path = self._preparar_certificado_pem()
 
+            self.logger.info(f"Certificado preparado:")
+            self.logger.info(f"  - Cert: {cert_path}")
+            self.logger.info(f"  - Key: {key_path}")
+
             # Criar contexto com certificado
+            # Configurar certificado para múltiplas origens possíveis do portal FGTS
+            client_certs = [
+                {
+                    "origin": "https://fgtsdigital.sistema.gov.br",
+                    "certPath": cert_path,
+                    "keyPath": key_path
+                },
+                {
+                    "origin": "https://*.sistema.gov.br",  # Qualquer subdomínio
+                    "certPath": cert_path,
+                    "keyPath": key_path
+                },
+                {
+                    "origin": "https://login.acesso.gov.br",  # Portal de login gov.br
+                    "certPath": cert_path,
+                    "keyPath": key_path
+                }
+            ]
+
+            self.logger.info(f"Configurando certificado para {len(client_certs)} origens...")
+
             self.context = await self.browser.new_context(
                 user_agent=config.USER_AGENT,
                 viewport={"width": 1920, "height": 1080},
                 locale="pt-BR",
                 timezone_id="America/Sao_Paulo",
                 accept_downloads=True,
-                client_certificates=[{
-                    "origin": config.FGTS_URL_BASE,
-                    "certPath": cert_path,
-                    "keyPath": key_path
-                }]
+                ignore_https_errors=False,  # Manter validação HTTPS
+                client_certificates=client_certs
             )
+
+            self.logger.info("✓ Certificado digital configurado no navegador")
 
             # Criar página
             self.page = await self.context.new_page()
@@ -399,6 +458,76 @@ class RoboFGTS:
             self.logger.debug(f"Erro ao detectar CAPTCHA: {str(e)}")
             return None
 
+    async def _verificar_captcha_resolvido(self, tipo_captcha: str) -> bool:
+        """
+        Verifica se o CAPTCHA foi resolvido pelo usuário
+
+        Args:
+            tipo_captcha: Tipo de CAPTCHA que foi detectado
+
+        Returns:
+            bool: True se CAPTCHA foi resolvido, False caso contrário
+        """
+        try:
+            # Para reCAPTCHA v2: Verificar se há token de resposta
+            if tipo_captcha == "recaptcha_v2":
+                # reCAPTCHA cria um textarea com a resposta quando resolvido
+                token = await self.page.evaluate("""
+                    () => {
+                        const response = document.getElementById('g-recaptcha-response');
+                        return response ? response.value : '';
+                    }
+                """)
+
+                if token and len(token) > 0:
+                    self.logger.debug(f"Token reCAPTCHA encontrado (tamanho: {len(token)})")
+                    return True
+
+            # Para hCaptcha: Verificar token de resposta
+            elif tipo_captcha == "hcaptcha":
+                token = await self.page.evaluate("""
+                    () => {
+                        const response = document.querySelector('[name=h-captcha-response]');
+                        return response ? response.value : '';
+                    }
+                """)
+
+                if token and len(token) > 0:
+                    self.logger.debug(f"Token hCaptcha encontrado (tamanho: {len(token)})")
+                    return True
+
+            # Para CAPTCHA de imagem: Verificar se input foi preenchido
+            elif tipo_captcha == "captcha_image":
+                input_seletor = await self._aguardar_elemento(
+                    config.SELECTORS["captcha"]["captcha_input"],
+                    timeout=2000
+                )
+                if input_seletor:
+                    valor = await self.page.input_value(input_seletor)
+                    if valor and len(valor) > 0:
+                        self.logger.debug(f"Input de CAPTCHA preenchido: {valor}")
+                        return True
+
+            # Verificação genérica: Se o CAPTCHA sumiu da página
+            tipo_atual = await self._detectar_captcha()
+            if tipo_atual is None:
+                self.logger.debug("CAPTCHA não detectado mais na página")
+                return True
+
+            # Verificação adicional: Se a URL mudou (navegou após resolver)
+            url_atual = self.page.url
+            if "login" not in url_atual.lower() and "auth" not in url_atual.lower():
+                self.logger.debug(f"URL mudou para: {url_atual}")
+                return True
+
+            return False
+
+        except Exception as e:
+            self.logger.debug(f"Erro ao verificar CAPTCHA resolvido: {str(e)}")
+            # Em caso de erro, verificar se CAPTCHA sumiu
+            tipo_atual = await self._detectar_captcha()
+            return tipo_atual is None
+
     async def _resolver_captcha_manual(self, tipo_captcha: str, timeout: int = None) -> bool:
         """
         Aguarda resolução manual do CAPTCHA pelo usuário
@@ -444,9 +573,8 @@ class RoboFGTS:
                 if tentativas % 5 == 0:  # A cada 10 segundos (2s * 5)
                     self.logger.info(f"⏳ Aguardando resolução do CAPTCHA... ({tempo_restante}s restantes)")
 
-                # Verificar se CAPTCHA ainda está presente
-                tipo_atual = await self._detectar_captcha()
-                if tipo_atual is None:
+                # Verificar se CAPTCHA foi resolvido
+                if await self._verificar_captcha_resolvido(tipo_captcha):
                     self.logger.info("✅ CAPTCHA resolvido com sucesso!")
                     await asyncio.sleep(2)  # Aguardar processamento
                     return True
@@ -544,30 +672,51 @@ class RoboFGTS:
         """
         try:
             # Detectar CAPTCHA
+            self.logger.debug("Verificando presença de CAPTCHA...")
             tipo_captcha = await self._detectar_captcha()
 
             if tipo_captcha is None:
                 # Sem CAPTCHA, pode prosseguir
+                self.logger.debug("✓ Nenhum CAPTCHA detectado na página")
                 return True
 
             # CAPTCHA detectado - escolher método de resolução
+            self.logger.info(f"CAPTCHA detectado do tipo: {tipo_captcha}")
+
             if config.CAPTCHA_MANUAL_MODE or not config.CAPTCHA_2CAPTCHA_KEY:
                 # Resolução manual
-                return await self._resolver_captcha_manual(tipo_captcha)
+                self.logger.info("Modo de resolução: MANUAL")
+                sucesso = await self._resolver_captcha_manual(tipo_captcha)
+
+                if sucesso:
+                    self.logger.info("✓ Continuando após resolução de CAPTCHA...")
+                    return True
+                else:
+                    self.logger.warning("⚠️ CAPTCHA não foi resolvido, mas continuando mesmo assim...")
+                    # Continuar mesmo se não conseguiu confirmar resolução
+                    # Pode ser que o usuário resolveu mas a detecção falhou
+                    return True
             else:
                 # Tentar resolução automática
+                self.logger.info("Modo de resolução: AUTOMÁTICO (2Captcha)")
                 sucesso = await self._resolver_captcha_2captcha(tipo_captcha)
 
                 # Se falhar, tentar manual como fallback
                 if not sucesso:
                     self.logger.warning("Resolução automática falhou. Tentando manual...")
-                    return await self._resolver_captcha_manual(tipo_captcha)
+                    sucesso = await self._resolver_captcha_manual(tipo_captcha)
 
-                return sucesso
+                    if not sucesso:
+                        self.logger.warning("⚠️ CAPTCHA não foi resolvido, mas continuando mesmo assim...")
+                        return True
+
+                return True
 
         except Exception as e:
             self.logger.error(f"❌ Erro ao lidar com CAPTCHA: {str(e)}")
-            return False
+            self.logger.warning("Continuando mesmo com erro na detecção de CAPTCHA...")
+            # Não bloquear por causa de erro na detecção
+            return True
 
     async def _fazer_login(self) -> bool:
         """
@@ -620,19 +769,54 @@ class RoboFGTS:
                 await self._screenshot_erro("captcha_nao_resolvido_inicial")
                 return False
 
+            # Aguardar um pouco mais para página processar após CAPTCHA
+            self.logger.debug("Aguardando página processar após CAPTCHA...")
+            await asyncio.sleep(3)
+
             # Clicar no botão de certificado digital
             self.logger.info("Procurando botão de certificado digital...")
+            self.logger.debug(f"Seletores a serem tentados: {config.SELECTORS['login']['btn_certificado']}")
+
+            # Logar URL atual antes de procurar botão
+            url_antes_botao = self.page.url
+            self.logger.info(f"URL antes de procurar botão: {url_antes_botao}")
+
             if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_certificado"]):
-                self.logger.error("Botão de certificado digital não encontrado na página")
+                self.logger.error("❌ Botão de certificado digital não encontrado na página")
                 self.logger.error("Possíveis causas:")
                 self.logger.error("  1. A estrutura do site mudou")
-                self.logger.error("  2. Certificado não está configurado corretamente no navegador")
-                self.logger.error("  3. Portal FGTS está fora do ar ou URL incorreta")
+                self.logger.error("  2. Ainda está na tela de CAPTCHA")
+                self.logger.error("  3. Já passou da tela de login")
+                self.logger.error("  4. Portal FGTS está fora do ar ou URL incorreta")
+
+                # Screenshot para debug
                 await self._screenshot_erro("login_botao_cert")
 
-                # Logar conteúdo da página para debug
+                # Logar URL atual
+                url_atual = self.page.url
+                self.logger.error(f"URL atual: {url_atual}")
+
+                # Logar título da página
+                titulo = await self.page.title()
+                self.logger.error(f"Título da página: {titulo}")
+
+                # Logar conteúdo da página para debug (primeiros 1000 chars)
                 page_content = await self.page.content()
-                self.logger.debug(f"Conteúdo da página (primeiros 500 chars): {page_content[:500]}")
+                self.logger.debug(f"Conteúdo da página (primeiros 1000 chars):")
+                self.logger.debug(page_content[:1000])
+
+                # Verificar se há botões visíveis na página
+                botoes = await self.page.evaluate("""
+                    () => {
+                        const buttons = Array.from(document.querySelectorAll('button, a[role="button"]'));
+                        return buttons.map(b => ({
+                            text: b.innerText?.substring(0, 50) || '',
+                            id: b.id || '',
+                            class: b.className || ''
+                        })).slice(0, 10);
+                    }
+                """)
+                self.logger.debug(f"Botões encontrados na página: {botoes}")
 
                 return False
 
