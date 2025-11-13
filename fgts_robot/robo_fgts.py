@@ -363,6 +363,212 @@ class RoboFGTS:
             # Não falhar aqui, pois pode ser que não haja tela inicial
             return True
 
+    async def _detectar_captcha(self) -> Optional[str]:
+        """
+        Detecta se há CAPTCHA na página atual
+
+        Returns:
+            str: Tipo de CAPTCHA detectado ('recaptcha_v2', 'hcaptcha', 'image', etc.) ou None
+        """
+        try:
+            self.logger.debug("Verificando se há CAPTCHA na página...")
+
+            # Verificar cada tipo de CAPTCHA
+            tipos_captcha = {
+                "recaptcha_v2": config.SELECTORS["captcha"]["recaptcha_v2"],
+                "hcaptcha": config.SELECTORS["captcha"]["hcaptcha"],
+                "captcha_image": config.SELECTORS["captcha"]["captcha_image"],
+                "captcha_frame": config.SELECTORS["captcha"]["captcha_frame"]
+            }
+
+            for tipo, seletores in tipos_captcha.items():
+                seletor = await self._aguardar_elemento(seletores, timeout=2000)
+                if seletor:
+                    self.logger.info(f"✋ CAPTCHA detectado: {tipo}")
+                    return tipo
+
+            # Também verificar no HTML se há referências a CAPTCHA
+            page_content = await self.page.content()
+            if any(keyword in page_content.lower() for keyword in ['recaptcha', 'hcaptcha', 'captcha']):
+                self.logger.info("✋ CAPTCHA detectado via análise de HTML")
+                return "captcha_generic"
+
+            return None
+
+        except Exception as e:
+            self.logger.debug(f"Erro ao detectar CAPTCHA: {str(e)}")
+            return None
+
+    async def _resolver_captcha_manual(self, tipo_captcha: str, timeout: int = None) -> bool:
+        """
+        Aguarda resolução manual do CAPTCHA pelo usuário
+
+        Args:
+            tipo_captcha: Tipo de CAPTCHA detectado
+            timeout: Tempo máximo de espera em segundos (padrão: config.CAPTCHA_TIMEOUT)
+
+        Returns:
+            bool: True se CAPTCHA foi resolvido, False se timeout
+        """
+        try:
+            timeout = timeout or config.CAPTCHA_TIMEOUT
+
+            self.logger.warning("=" * 70)
+            self.logger.warning("🔴 CAPTCHA DETECTADO - AÇÃO NECESSÁRIA!")
+            self.logger.warning("=" * 70)
+            self.logger.warning(f"Tipo: {tipo_captcha}")
+            self.logger.warning(f"")
+            self.logger.warning(f"📋 INSTRUÇÕES:")
+            self.logger.warning(f"  1. Vá até a janela do navegador que foi aberta")
+            self.logger.warning(f"  2. Resolva o CAPTCHA manualmente")
+            self.logger.warning(f"  3. Aguarde - o robô continuará automaticamente")
+            self.logger.warning(f"")
+            self.logger.warning(f"⏱️  Tempo limite: {timeout} segundos ({timeout//60} minutos)")
+            self.logger.warning("=" * 70)
+
+            # Se estiver em modo headless, avisar que não é possível
+            if self.headless:
+                self.logger.error("❌ ERRO: CAPTCHA detectado em modo HEADLESS!")
+                self.logger.error("Configure HEADLESS=False no arquivo .env para resolver CAPTCHA manualmente")
+                return False
+
+            inicio = time.time()
+            tentativas = 0
+
+            while time.time() - inicio < timeout:
+                tentativas += 1
+                tempo_decorrido = int(time.time() - inicio)
+                tempo_restante = timeout - tempo_decorrido
+
+                # Log a cada 10 segundos
+                if tentativas % 5 == 0:  # A cada 10 segundos (2s * 5)
+                    self.logger.info(f"⏳ Aguardando resolução do CAPTCHA... ({tempo_restante}s restantes)")
+
+                # Verificar se CAPTCHA ainda está presente
+                tipo_atual = await self._detectar_captcha()
+                if tipo_atual is None:
+                    self.logger.info("✅ CAPTCHA resolvido com sucesso!")
+                    await asyncio.sleep(2)  # Aguardar processamento
+                    return True
+
+                await asyncio.sleep(config.CAPTCHA_CHECK_INTERVAL)
+
+            self.logger.error(f"⏰ Timeout: CAPTCHA não foi resolvido em {timeout} segundos")
+            return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao aguardar resolução manual do CAPTCHA: {str(e)}")
+            return False
+
+    async def _resolver_captcha_2captcha(self, tipo_captcha: str) -> bool:
+        """
+        Resolve CAPTCHA automaticamente usando o serviço 2Captcha
+
+        Args:
+            tipo_captcha: Tipo de CAPTCHA detectado
+
+        Returns:
+            bool: True se resolvido com sucesso, False caso contrário
+        """
+        try:
+            if not config.CAPTCHA_2CAPTCHA_KEY:
+                self.logger.warning("Chave 2Captcha não configurada. Use resolução manual.")
+                return False
+
+            self.logger.info("🤖 Tentando resolver CAPTCHA automaticamente com 2Captcha...")
+
+            # Importar biblioteca 2captcha (lazy import)
+            try:
+                from twocaptcha import TwoCaptcha
+            except ImportError:
+                self.logger.error("Biblioteca 'twocaptcha' não instalada!")
+                self.logger.error("Execute: pip install 2captcha-python")
+                return False
+
+            solver = TwoCaptcha(config.CAPTCHA_2CAPTCHA_KEY)
+
+            # Obter URL da página atual
+            url_atual = self.page.url
+
+            # Resolver baseado no tipo
+            if tipo_captcha == "recaptcha_v2":
+                # Encontrar sitekey
+                sitekey_element = await self._aguardar_elemento(["[data-sitekey]"], timeout=5000)
+                if not sitekey_element:
+                    self.logger.error("Não foi possível encontrar sitekey do reCAPTCHA")
+                    return False
+
+                sitekey = await self.page.get_attribute(sitekey_element, "data-sitekey")
+                self.logger.info(f"Resolvendo reCAPTCHA v2 (sitekey: {sitekey[:20]}...)")
+
+                result = solver.recaptcha(sitekey=sitekey, url=url_atual)
+
+                # Injetar resposta do CAPTCHA
+                await self.page.evaluate(f"""
+                    document.getElementById('g-recaptcha-response').innerHTML = '{result["code"]}';
+                """)
+
+                self.logger.info("✅ CAPTCHA resolvido automaticamente!")
+                return True
+
+            elif tipo_captcha == "hcaptcha":
+                # Similar ao reCAPTCHA
+                sitekey_element = await self._aguardar_elemento(["[data-sitekey]"], timeout=5000)
+                if not sitekey_element:
+                    return False
+
+                sitekey = await self.page.get_attribute(sitekey_element, "data-sitekey")
+                result = solver.hcaptcha(sitekey=sitekey, url=url_atual)
+
+                await self.page.evaluate(f"""
+                    document.querySelector('[name=h-captcha-response]').innerHTML = '{result["code"]}';
+                """)
+
+                self.logger.info("✅ hCaptcha resolvido automaticamente!")
+                return True
+
+            else:
+                self.logger.warning(f"Tipo de CAPTCHA '{tipo_captcha}' não suportado para resolução automática")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao resolver CAPTCHA com 2Captcha: {str(e)}")
+            return False
+
+    async def _lidar_com_captcha(self) -> bool:
+        """
+        Detecta e resolve CAPTCHA (manual ou automaticamente)
+
+        Returns:
+            bool: True se não há CAPTCHA ou foi resolvido, False caso contrário
+        """
+        try:
+            # Detectar CAPTCHA
+            tipo_captcha = await self._detectar_captcha()
+
+            if tipo_captcha is None:
+                # Sem CAPTCHA, pode prosseguir
+                return True
+
+            # CAPTCHA detectado - escolher método de resolução
+            if config.CAPTCHA_MANUAL_MODE or not config.CAPTCHA_2CAPTCHA_KEY:
+                # Resolução manual
+                return await self._resolver_captcha_manual(tipo_captcha)
+            else:
+                # Tentar resolução automática
+                sucesso = await self._resolver_captcha_2captcha(tipo_captcha)
+
+                # Se falhar, tentar manual como fallback
+                if not sucesso:
+                    self.logger.warning("Resolução automática falhou. Tentando manual...")
+                    return await self._resolver_captcha_manual(tipo_captcha)
+
+                return sucesso
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao lidar com CAPTCHA: {str(e)}")
+            return False
+
     async def _fazer_login(self) -> bool:
         """
         Realiza login no FGTS Digital usando certificado
@@ -408,6 +614,12 @@ class RoboFGTS:
             self.logger.info("Verificando se há navegação inicial necessária...")
             await self._navegar_tela_inicial()
 
+            # Verificar e resolver CAPTCHA (se houver)
+            if not await self._lidar_com_captcha():
+                self.logger.error("Falha ao resolver CAPTCHA na tela inicial")
+                await self._screenshot_erro("captcha_nao_resolvido_inicial")
+                return False
+
             # Clicar no botão de certificado digital
             self.logger.info("Procurando botão de certificado digital...")
             if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_certificado"]):
@@ -439,6 +651,12 @@ class RoboFGTS:
 
             # Aguardar carregamento da página inicial
             await asyncio.sleep(3)
+
+            # Verificar e resolver CAPTCHA após login (se houver)
+            if not await self._lidar_com_captcha():
+                self.logger.error("Falha ao resolver CAPTCHA após autenticação")
+                await self._screenshot_erro("captcha_nao_resolvido_pos_login")
+                return False
 
             # Verificar se login foi bem-sucedido (procurar elemento da página logada)
             try:

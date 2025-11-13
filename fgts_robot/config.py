@@ -28,6 +28,12 @@ HEADLESS = os.getenv("HEADLESS", "False").lower() in ("true", "1", "yes")
 BROWSER_TIMEOUT = int(os.getenv("TIMEOUT", "30000"))  # 30 segundos padrão
 SLOW_MO = int(os.getenv("SLOW_MO", "100"))  # Delay em ms entre ações
 
+# Configurações de CAPTCHA
+CAPTCHA_MANUAL_MODE = os.getenv("CAPTCHA_MANUAL", "True").lower() in ("true", "1", "yes")
+CAPTCHA_TIMEOUT = int(os.getenv("CAPTCHA_TIMEOUT", "300"))  # 5 minutos para resolver manualmente
+CAPTCHA_2CAPTCHA_KEY = os.getenv("2CAPTCHA_API_KEY", "")  # Chave API do 2Captcha (opcional)
+CAPTCHA_CHECK_INTERVAL = 2  # Verificar a cada 2 segundos se CAPTCHA foi resolvido
+
 # URLs do FGTS Digital
 FGTS_URL_BASE = "https://fgtsdigital.sistema.gov.br"
 FGTS_URL_LOGIN = f"{FGTS_URL_BASE}/portal"
@@ -136,6 +142,40 @@ SELECTORS = {
             "button:has-text('Sair')",
             "//button[contains(text(), 'Sair')]",
             "#btn-logout"
+        ]
+    },
+    "captcha": {
+        # Detectar diferentes tipos de CAPTCHA
+        "recaptcha_v2": [
+            "iframe[src*='recaptcha']",
+            ".g-recaptcha",
+            "#recaptcha",
+            "[data-sitekey]"
+        ],
+        "recaptcha_v3": [
+            "script[src*='recaptcha/api.js']",
+            "[data-callback]"
+        ],
+        "hcaptcha": [
+            "iframe[src*='hcaptcha']",
+            ".h-captcha",
+            "#hcaptcha"
+        ],
+        "captcha_image": [
+            "img[alt*='captcha' i]",
+            "img[src*='captcha' i]",
+            "#captcha-image",
+            ".captcha-img"
+        ],
+        "captcha_input": [
+            "input[name*='captcha' i]",
+            "input[placeholder*='captcha' i]",
+            "#captcha",
+            ".captcha-input"
+        ],
+        "captcha_frame": [
+            "iframe[title*='captcha' i]",
+            "iframe[name*='captcha' i]"
         ]
     }
 }

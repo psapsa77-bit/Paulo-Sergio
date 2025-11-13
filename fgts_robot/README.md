@@ -8,6 +8,7 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 - [Requisitos](#-requisitos)
 - [Instalação](#-instalação)
 - [Configuração](#-configuração)
+- [Sistema de CAPTCHA](#-sistema-de-captcha)
 - [Interface Web](#-interface-web)
 - [Uso CLI](#-uso-cli)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
@@ -21,6 +22,7 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 - ✅ **Interface Web** moderna e intuitiva (Streamlit)
 - ✅ **Interface CLI** completa para terminal
 - ✅ Autenticação automática com certificado digital A1 (.pfx)
+- ✅ **Sistema inteligente de CAPTCHA** (resolução manual ou automática)
 - ✅ Gestão de múltiplas empresas via procuração eletrônica
 - ✅ Extração completa de guias FGTS (pagas e pendentes)
 - ✅ Exportação para Excel com abas separadas por empresa
@@ -155,6 +157,47 @@ cp /caminho/do/seu/certificado.pfx certificados/
 ```
 
 ⚠️ **IMPORTANTE:** Nunca commite seu certificado ou arquivo .env no git!
+
+## 🛡️ Sistema de CAPTCHA
+
+O robô possui um **sistema inteligente de detecção e resolução de CAPTCHA**!
+
+### 🖐️ Modo Manual (Padrão - Recomendado)
+
+Por padrão, quando um CAPTCHA é detectado:
+1. O robô **pausa automaticamente**
+2. Você recebe instruções claras no log
+3. **Resolva o CAPTCHA** na janela do navegador
+4. O robô **continua automaticamente** após resolver
+
+**Configuração:**
+```env
+CAPTCHA_MANUAL=True
+HEADLESS=False
+```
+
+### 🤖 Modo Automático (Avançado)
+
+Para automação completa, configure o serviço **2Captcha**:
+
+```env
+CAPTCHA_MANUAL=False
+2CAPTCHA_API_KEY=sua_chave_api_aqui
+```
+
+**Requisitos:**
+- Conta no [2Captcha](https://2captcha.com)
+- Instalar: `pip install 2captcha-python`
+- Custo: ~$3 por 1000 CAPTCHAs
+
+### 📖 Documentação Completa
+
+Para mais detalhes sobre CAPTCHA, veja: **[CAPTCHA.md](CAPTCHA.md)**
+
+- Tipos de CAPTCHA suportados
+- Guia passo a passo
+- Solução de problemas
+- Comparação de custos
 
 ## 🌐 Interface Web
 
