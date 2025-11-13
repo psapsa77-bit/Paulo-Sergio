@@ -1044,6 +1044,7 @@ class RoboFGTS:
 
                 # Container do modal
                 "[role='dialog']:has-text('perfil')",
+                ".modal:has-text('meu perfil')",
                 ".modal:has-text('procurador')",
                 ".dialog:has-text('acesso')"
             ]
@@ -1073,7 +1074,7 @@ class RoboFGTS:
                     }
                 """)
 
-                if textos_na_pagina['temPerfil'] and textos_na_pagina['temProcurador']:
+                if textos_na_pagina['temPerfil'] or textos_na_pagina['temProcurador']:
                     popup_encontrado = True
                     self.logger.info("✓ Pop-up de seleção detectado via análise de texto!")
 
@@ -1081,35 +1082,40 @@ class RoboFGTS:
                 self.logger.info("ℹ️  Pop-up de seleção de perfil não detectado (pode já estar na tela correta)")
                 return True
 
-            # Pop-up encontrado - procurar e clicar em "Sou Procurador"
+            # ========================================================================
+            # ETAPA 1: Clicar em "Meu Perfil"
+            # ========================================================================
             self.logger.info("")
-            self.logger.info("🔍 Procurando opção 'Sou Procurador'...")
+            self.logger.info("🔍 Procurando opção 'Meu Perfil'...")
 
-            seletores_procurador = [
+            seletores_meu_perfil = [
                 # Botões com texto
-                "button:has-text('Sou Procurador')",
-                "button:has-text('Procurador')",
-                "a:has-text('Sou Procurador')",
-                "a:has-text('Procurador')",
+                "button:has-text('Meu Perfil')",
+                "button:has-text('Meu perfil')",
+                "a:has-text('Meu Perfil')",
+                "a:has-text('Meu perfil')",
 
                 # Divs/cards clicáveis
-                "[role='button']:has-text('Procurador')",
-                ".option:has-text('Procurador')",
-                ".card:has-text('Procurador')",
+                "[role='button']:has-text('Meu Perfil')",
+                "[role='button']:has-text('Meu perfil')",
+                ".option:has-text('Meu Perfil')",
+                ".card:has-text('Meu Perfil')",
 
                 # XPath
-                "//button[contains(text(), 'Procurador')]",
-                "//a[contains(text(), 'Procurador')]",
+                "//button[contains(text(), 'Meu Perfil')]",
+                "//button[contains(text(), 'Meu perfil')]",
+                "//a[contains(text(), 'Meu Perfil')]",
+                "//a[contains(text(), 'Meu perfil')]",
 
                 # IDs e classes comuns
-                "#btn-procurador",
-                ".btn-procurador",
-                "[data-perfil='procurador']"
+                "#btn-meu-perfil",
+                ".btn-meu-perfil",
+                "[data-perfil='meu-perfil']"
             ]
 
-            procurador_clicado = False
+            meu_perfil_clicado = False
 
-            for seletor in seletores_procurador:
+            for seletor in seletores_meu_perfil:
                 try:
                     elemento = await self.page.query_selector(seletor)
                     if elemento and await elemento.is_visible():
@@ -1118,51 +1124,25 @@ class RoboFGTS:
 
                         # Clicar
                         await elemento.click()
-                        procurador_clicado = True
-                        self.logger.info("✅ Clicado em 'Sou Procurador'!")
+                        meu_perfil_clicado = True
+                        self.logger.info("✅ Clicado em 'Meu Perfil'!")
 
-                        # Aguardar navegação
-                        await asyncio.sleep(3)
-
-                        url_apos = self.page.url
-                        self.logger.info(f"📍 URL após seleção: {url_apos}")
-
+                        # Aguardar um pouco
+                        await asyncio.sleep(2)
                         break
 
                 except Exception as e:
                     continue
 
-            if not procurador_clicado:
-                # Não encontrou - tirar screenshot e listar opções disponíveis
-                self.logger.warning("⚠️  Não foi possível encontrar opção 'Sou Procurador'")
-
-                await self._screenshot_erro("popup_perfil_nao_encontrado")
-
-                # Listar todas as opções visíveis
-                opcoes = await self.page.evaluate("""
-                    () => {
-                        const opcoes = [];
-                        document.querySelectorAll('button, a, [role="button"]').forEach(el => {
-                            if (el.offsetParent !== null && el.innerText.trim()) {
-                                opcoes.push(el.innerText.trim().substring(0, 50));
-                            }
-                        });
-                        return opcoes.slice(0, 10);
-                    }
-                """)
-
-                self.logger.warning("Opções disponíveis na tela:")
-                for i, opcao in enumerate(opcoes, 1):
-                    self.logger.warning(f"  {i}. {opcao}")
-
-                # Tentar clicar em qualquer botão que pareça ser de procurador
-                self.logger.info("Tentando clicar em qualquer opção relacionada a 'procurador'...")
+            if not meu_perfil_clicado:
+                # Tentar clicar via JavaScript
+                self.logger.info("Tentando clicar em 'Meu Perfil' via JavaScript...")
                 resultado = await self.page.evaluate("""
                     () => {
                         const elementos = document.querySelectorAll('button, a, [role="button"], .card, .option');
                         for (const el of elementos) {
                             const texto = el.innerText.toLowerCase();
-                            if (texto.includes('procurador') || texto.includes('procuração')) {
+                            if (texto.includes('meu perfil')) {
                                 el.click();
                                 return { success: true, texto: el.innerText };
                             }
@@ -1173,10 +1153,104 @@ class RoboFGTS:
 
                 if resultado.get('success'):
                     self.logger.info(f"✓ Clicado via JavaScript em: '{resultado.get('texto')}'")
-                    await asyncio.sleep(3)
+                    meu_perfil_clicado = True
+                    await asyncio.sleep(2)
                 else:
-                    self.logger.warning("❌ Não foi possível clicar automaticamente")
-                    self.logger.warning("📌 Verifique o screenshot e me informe as opções disponíveis")
+                    self.logger.warning("⚠️  Não foi possível encontrar opção 'Meu Perfil'")
+                    await self._screenshot_erro("meu_perfil_nao_encontrado")
+
+            # ========================================================================
+            # ETAPA 2: Clicar em "Definir"
+            # ========================================================================
+            if meu_perfil_clicado:
+                self.logger.info("")
+                self.logger.info("🔍 Procurando botão 'Definir'...")
+
+                seletores_definir = [
+                    # Botões com texto
+                    "button:has-text('Definir')",
+                    "button:has-text('definir')",
+                    "a:has-text('Definir')",
+
+                    # Botões de confirmação comuns
+                    "button:has-text('Confirmar')",
+                    "button:has-text('OK')",
+                    "button:has-text('Continuar')",
+
+                    # XPath
+                    "//button[contains(text(), 'Definir')]",
+                    "//button[contains(text(), 'Confirmar')]",
+
+                    # IDs e classes
+                    "#btn-definir",
+                    ".btn-definir",
+                    "button[type='submit']"
+                ]
+
+                definir_clicado = False
+
+                for seletor in seletores_definir:
+                    try:
+                        elemento = await self.page.query_selector(seletor)
+                        if elemento and await elemento.is_visible():
+                            texto = await elemento.inner_text()
+                            self.logger.info(f"✓ Encontrado botão: '{texto.strip()}'")
+
+                            # Clicar
+                            await elemento.click()
+                            definir_clicado = True
+                            self.logger.info("✅ Clicado em 'Definir'!")
+
+                            # Aguardar navegação
+                            await asyncio.sleep(3)
+
+                            url_apos = self.page.url
+                            self.logger.info(f"📍 URL após seleção: {url_apos}")
+                            break
+
+                    except Exception as e:
+                        continue
+
+                if not definir_clicado:
+                    # Tentar via JavaScript
+                    self.logger.info("Tentando clicar em 'Definir' via JavaScript...")
+                    resultado = await self.page.evaluate("""
+                        () => {
+                            const elementos = document.querySelectorAll('button, a, [type="submit"]');
+                            for (const el of elementos) {
+                                const texto = el.innerText.toLowerCase();
+                                if (texto.includes('definir') || texto.includes('confirmar') || texto.includes('continuar')) {
+                                    el.click();
+                                    return { success: true, texto: el.innerText };
+                                }
+                            }
+                            return { success: false };
+                        }
+                    """)
+
+                    if resultado.get('success'):
+                        self.logger.info(f"✓ Clicado via JavaScript em: '{resultado.get('texto')}'")
+                        await asyncio.sleep(3)
+                    else:
+                        self.logger.warning("⚠️  Não foi possível encontrar botão 'Definir'")
+                        await self._screenshot_erro("definir_nao_encontrado")
+
+                        # Listar opções disponíveis
+                        opcoes = await self.page.evaluate("""
+                            () => {
+                                const opcoes = [];
+                                document.querySelectorAll('button, a').forEach(el => {
+                                    if (el.offsetParent !== null && el.innerText.trim()) {
+                                        opcoes.push(el.innerText.trim().substring(0, 50));
+                                    }
+                                });
+                                return opcoes.slice(0, 10);
+                            }
+                        """)
+
+                        self.logger.warning("Botões disponíveis na tela:")
+                        for i, opcao in enumerate(opcoes, 1):
+                            self.logger.warning(f"  {i}. {opcao}")
 
             self.logger.info("=" * 70)
             return True
