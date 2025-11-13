@@ -51,14 +51,52 @@ Todas as dependências estão listadas no arquivo `requirements.txt`:
 
 ## 🔧 Instalação
 
-### 1. Clone o repositório
+### 🚀 Instalação Automática (RECOMENDADO!)
+
+**A forma mais fácil de instalar tudo!** Execute um único comando que instala todas as dependências automaticamente.
+
+#### Windows
+
+Clique duas vezes no arquivo:
+```
+INSTALAR_TUDO.bat
+```
+
+Ou execute no CMD/PowerShell:
+```cmd
+INSTALAR_TUDO.bat
+```
+
+#### Linux/macOS
+
+```bash
+chmod +x INSTALAR_TUDO.sh
+./INSTALAR_TUDO.sh
+```
+
+**O instalador automático faz tudo para você:**
+- ✅ Cria ambiente virtual
+- ✅ Instala todas as dependências Python
+- ✅ Instala o navegador Chromium
+- ✅ Cria arquivo .env
+- ✅ Cria estrutura de pastas
+
+**Tempo estimado:** 5-10 minutos
+
+---
+
+### 📖 Instalação Manual (Opcional)
+
+Se preferir fazer manualmente passo a passo:
+
+#### 1. Clone o repositório
 
 ```bash
 git clone https://github.com/seu-usuario/Paulo-Sergio.git
 cd Paulo-Sergio/fgts_robot
 ```
 
-### 2. Crie um ambiente virtual (recomendado)
+#### 2. Crie um ambiente virtual (recomendado)
 
 ```bash
 # No Linux/macOS
@@ -70,13 +108,13 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-### 3. Instale as dependências
+#### 3. Instale as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Instale o navegador Chromium do Playwright
+#### 4. Instale o navegador Chromium do Playwright
 
 ```bash
 playwright install chromium
