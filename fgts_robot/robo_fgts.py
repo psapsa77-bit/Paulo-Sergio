@@ -1083,66 +1083,66 @@ class RoboFGTS:
                 return True
 
             # ========================================================================
-            # ETAPA 1: Clicar em "Meu Perfil"
+            # Clicar em "Definir" para confirmar perfil
             # ========================================================================
+            # NOTA: "Meu Perfil" já vem selecionado por padrão, basta confirmar
             self.logger.info("")
-            self.logger.info("🔍 Procurando opção 'Meu Perfil'...")
+            self.logger.info("🔍 Procurando botão 'Definir' para confirmar perfil...")
 
-            seletores_meu_perfil = [
+            seletores_definir = [
                 # Botões com texto
-                "button:has-text('Meu Perfil')",
-                "button:has-text('Meu perfil')",
-                "a:has-text('Meu Perfil')",
-                "a:has-text('Meu perfil')",
+                "button:has-text('Definir')",
+                "button:has-text('definir')",
+                "a:has-text('Definir')",
 
-                # Divs/cards clicáveis
-                "[role='button']:has-text('Meu Perfil')",
-                "[role='button']:has-text('Meu perfil')",
-                ".option:has-text('Meu Perfil')",
-                ".card:has-text('Meu Perfil')",
+                # Botões de confirmação comuns
+                "button:has-text('Confirmar')",
+                "button:has-text('OK')",
+                "button:has-text('Continuar')",
 
                 # XPath
-                "//button[contains(text(), 'Meu Perfil')]",
-                "//button[contains(text(), 'Meu perfil')]",
-                "//a[contains(text(), 'Meu Perfil')]",
-                "//a[contains(text(), 'Meu perfil')]",
+                "//button[contains(text(), 'Definir')]",
+                "//button[contains(text(), 'Confirmar')]",
 
-                # IDs e classes comuns
-                "#btn-meu-perfil",
-                ".btn-meu-perfil",
-                "[data-perfil='meu-perfil']"
+                # IDs e classes
+                "#btn-definir",
+                ".btn-definir",
+                "button[type='submit']"
             ]
 
-            meu_perfil_clicado = False
+            definir_clicado = False
 
-            for seletor in seletores_meu_perfil:
+            for seletor in seletores_definir:
                 try:
                     elemento = await self.page.query_selector(seletor)
                     if elemento and await elemento.is_visible():
                         texto = await elemento.inner_text()
-                        self.logger.info(f"✓ Encontrado: '{texto.strip()}'")
+                        self.logger.info(f"✓ Encontrado botão: '{texto.strip()}'")
 
                         # Clicar
                         await elemento.click()
-                        meu_perfil_clicado = True
-                        self.logger.info("✅ Clicado em 'Meu Perfil'!")
+                        definir_clicado = True
+                        self.logger.info("✅ Clicado em 'Definir'!")
 
-                        # Aguardar um pouco
-                        await asyncio.sleep(2)
+                        # Aguardar navegação
+                        await asyncio.sleep(3)
+
+                        url_apos = self.page.url
+                        self.logger.info(f"📍 URL após seleção: {url_apos}")
                         break
 
                 except Exception as e:
                     continue
 
-            if not meu_perfil_clicado:
-                # Tentar clicar via JavaScript
-                self.logger.info("Tentando clicar em 'Meu Perfil' via JavaScript...")
+            if not definir_clicado:
+                # Tentar via JavaScript
+                self.logger.info("Tentando clicar em 'Definir' via JavaScript...")
                 resultado = await self.page.evaluate("""
                     () => {
-                        const elementos = document.querySelectorAll('button, a, [role="button"], .card, .option');
+                        const elementos = document.querySelectorAll('button, a, [type="submit"]');
                         for (const el of elementos) {
                             const texto = el.innerText.toLowerCase();
-                            if (texto.includes('meu perfil')) {
+                            if (texto.includes('definir') || texto.includes('confirmar') || texto.includes('continuar')) {
                                 el.click();
                                 return { success: true, texto: el.innerText };
                             }
@@ -1153,104 +1153,27 @@ class RoboFGTS:
 
                 if resultado.get('success'):
                     self.logger.info(f"✓ Clicado via JavaScript em: '{resultado.get('texto')}'")
-                    meu_perfil_clicado = True
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(3)
                 else:
-                    self.logger.warning("⚠️  Não foi possível encontrar opção 'Meu Perfil'")
-                    await self._screenshot_erro("meu_perfil_nao_encontrado")
+                    self.logger.warning("⚠️  Não foi possível encontrar botão 'Definir'")
+                    await self._screenshot_erro("definir_nao_encontrado")
 
-            # ========================================================================
-            # ETAPA 2: Clicar em "Definir"
-            # ========================================================================
-            if meu_perfil_clicado:
-                self.logger.info("")
-                self.logger.info("🔍 Procurando botão 'Definir'...")
-
-                seletores_definir = [
-                    # Botões com texto
-                    "button:has-text('Definir')",
-                    "button:has-text('definir')",
-                    "a:has-text('Definir')",
-
-                    # Botões de confirmação comuns
-                    "button:has-text('Confirmar')",
-                    "button:has-text('OK')",
-                    "button:has-text('Continuar')",
-
-                    # XPath
-                    "//button[contains(text(), 'Definir')]",
-                    "//button[contains(text(), 'Confirmar')]",
-
-                    # IDs e classes
-                    "#btn-definir",
-                    ".btn-definir",
-                    "button[type='submit']"
-                ]
-
-                definir_clicado = False
-
-                for seletor in seletores_definir:
-                    try:
-                        elemento = await self.page.query_selector(seletor)
-                        if elemento and await elemento.is_visible():
-                            texto = await elemento.inner_text()
-                            self.logger.info(f"✓ Encontrado botão: '{texto.strip()}'")
-
-                            # Clicar
-                            await elemento.click()
-                            definir_clicado = True
-                            self.logger.info("✅ Clicado em 'Definir'!")
-
-                            # Aguardar navegação
-                            await asyncio.sleep(3)
-
-                            url_apos = self.page.url
-                            self.logger.info(f"📍 URL após seleção: {url_apos}")
-                            break
-
-                    except Exception as e:
-                        continue
-
-                if not definir_clicado:
-                    # Tentar via JavaScript
-                    self.logger.info("Tentando clicar em 'Definir' via JavaScript...")
-                    resultado = await self.page.evaluate("""
+                    # Listar opções disponíveis
+                    opcoes = await self.page.evaluate("""
                         () => {
-                            const elementos = document.querySelectorAll('button, a, [type="submit"]');
-                            for (const el of elementos) {
-                                const texto = el.innerText.toLowerCase();
-                                if (texto.includes('definir') || texto.includes('confirmar') || texto.includes('continuar')) {
-                                    el.click();
-                                    return { success: true, texto: el.innerText };
+                            const opcoes = [];
+                            document.querySelectorAll('button, a').forEach(el => {
+                                if (el.offsetParent !== null && el.innerText.trim()) {
+                                    opcoes.push(el.innerText.trim().substring(0, 50));
                                 }
-                            }
-                            return { success: false };
+                            });
+                            return opcoes.slice(0, 10);
                         }
                     """)
 
-                    if resultado.get('success'):
-                        self.logger.info(f"✓ Clicado via JavaScript em: '{resultado.get('texto')}'")
-                        await asyncio.sleep(3)
-                    else:
-                        self.logger.warning("⚠️  Não foi possível encontrar botão 'Definir'")
-                        await self._screenshot_erro("definir_nao_encontrado")
-
-                        # Listar opções disponíveis
-                        opcoes = await self.page.evaluate("""
-                            () => {
-                                const opcoes = [];
-                                document.querySelectorAll('button, a').forEach(el => {
-                                    if (el.offsetParent !== null && el.innerText.trim()) {
-                                        opcoes.push(el.innerText.trim().substring(0, 50));
-                                    }
-                                });
-                                return opcoes.slice(0, 10);
-                            }
-                        """)
-
-                        self.logger.warning("Botões disponíveis na tela:")
-                        for i, opcao in enumerate(opcoes, 1):
-                            self.logger.warning(f"  {i}. {opcao}")
+                    self.logger.warning("Botões disponíveis na tela:")
+                    for i, opcao in enumerate(opcoes, 1):
+                        self.logger.warning(f"  {i}. {opcao}")
 
             self.logger.info("=" * 70)
             return True
