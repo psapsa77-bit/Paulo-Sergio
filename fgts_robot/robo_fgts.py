@@ -308,6 +308,61 @@ class RoboFGTS:
         delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
         await asyncio.sleep(delay)
 
+    async def _navegar_tela_inicial(self) -> bool:
+        """
+        Navega pela tela inicial do portal clicando em botões necessários
+
+        Muitos portais gov.br têm uma tela inicial com botões como "Acessar", "Entrar", etc.
+        antes de chegar na tela de login com certificado.
+
+        Returns:
+            bool: True se navegação bem-sucedida ou não necessária
+        """
+        try:
+            self.logger.info("Verificando se há navegação inicial necessária...")
+
+            # Aguardar um pouco para a página carregar completamente
+            await asyncio.sleep(2)
+
+            # Lista de botões comuns em telas iniciais
+            botoes_iniciais = [
+                ("Acessar", config.SELECTORS["inicial"]["btn_acessar"]),
+                ("Entrar", config.SELECTORS["inicial"]["btn_entrar"]),
+                ("Login", config.SELECTORS["inicial"]["btn_login"]),
+                ("gov.br", config.SELECTORS["inicial"]["btn_gov_br"])
+            ]
+
+            # Tentar clicar em cada tipo de botão (se existir)
+            for nome_botao, seletores in botoes_iniciais:
+                seletor = await self._aguardar_elemento(seletores, timeout=3000)
+
+                if seletor:
+                    self.logger.info(f"Encontrado botão '{nome_botao}', clicando...")
+                    try:
+                        await self.page.click(seletor)
+                        await self._delay_aleatorio()
+
+                        # Aguardar navegação
+                        await asyncio.sleep(2)
+
+                        url_atual = self.page.url
+                        self.logger.info(f"Após clicar em '{nome_botao}', URL: {url_atual}")
+
+                        # Se a URL mudou significativamente, provável que avançamos
+                        break
+
+                    except Exception as e:
+                        self.logger.warning(f"Erro ao clicar em '{nome_botao}': {str(e)}")
+                        continue
+
+            self.logger.info("Navegação inicial concluída")
+            return True
+
+        except Exception as e:
+            self.logger.warning(f"Erro durante navegação inicial: {str(e)}")
+            # Não falhar aqui, pois pode ser que não haja tela inicial
+            return True
+
     async def _fazer_login(self) -> bool:
         """
         Realiza login no FGTS Digital usando certificado
@@ -348,6 +403,10 @@ class RoboFGTS:
 
             # Aguardar página carregar completamente
             await asyncio.sleep(2)
+
+            # Navegar pela tela inicial (se houver botões de navegação)
+            self.logger.info("Verificando se há navegação inicial necessária...")
+            await self._navegar_tela_inicial()
 
             # Clicar no botão de certificado digital
             self.logger.info("Procurando botão de certificado digital...")

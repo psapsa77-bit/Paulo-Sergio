@@ -48,11 +48,44 @@ DELAY_MAX = 3
 
 # Seletores do Site (usando múltiplas estratégias)
 SELECTORS = {
+    "inicial": {
+        # Botões comuns na tela inicial de portais gov.br
+        "btn_acessar": [
+            "button:has-text('Acessar')",
+            "a:has-text('Acessar')",
+            "//button[contains(text(), 'Acessar')]",
+            "//a[contains(text(), 'Acessar')]"
+        ],
+        "btn_entrar": [
+            "button:has-text('Entrar')",
+            "a:has-text('Entrar')",
+            "//button[contains(text(), 'Entrar')]",
+            "//a[contains(text(), 'Entrar')]"
+        ],
+        "btn_login": [
+            "button:has-text('Login')",
+            "a:has-text('Login')",
+            "//button[contains(text(), 'Login')]",
+            "//a[contains(text(), 'Login')]",
+            "#login",
+            ".btn-login"
+        ],
+        "btn_gov_br": [
+            "button:has-text('gov.br')",
+            "a:has-text('gov.br')",
+            "//button[contains(text(), 'gov.br')]",
+            "//a[contains(text(), 'gov.br')]"
+        ]
+    },
     "login": {
         "btn_certificado": [
             "button:has-text('Certificado Digital')",
-            "//button[contains(text(), 'Certificado Digital')]",
-            "#btn-certificado-digital"
+            "a:has-text('Certificado Digital')",
+            "//button[contains(text(), 'Certificado')]",
+            "//a[contains(text(), 'Certificado')]",
+            "#btn-certificado-digital",
+            "[data-testid*='certificado']",
+            ".btn-certificado"
         ],
         "select_certificado": [
             "select#certificado",
@@ -62,7 +95,8 @@ SELECTORS = {
         "btn_entrar": [
             "button:has-text('Entrar')",
             "//button[contains(text(), 'Entrar')]",
-            "#btn-login"
+            "#btn-login",
+            "button[type='submit']"
         ]
     },
     "empresas": {
