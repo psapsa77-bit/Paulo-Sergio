@@ -1008,6 +1008,177 @@ class RoboFGTS:
             self.logger.warning(f"Erro ao verificar pop-ups: {str(e)}")
             return True  # Não bloquear por causa disso
 
+    async def _selecionar_perfil_procurador(self) -> bool:
+        """
+        Detecta e seleciona o perfil de acesso após login com certificado
+
+        Após login, o portal pode mostrar um pop-up perguntando:
+        - "Meu Perfil" (acesso como pessoa/empresa do certificado)
+        - "Sou Procurador" (acesso via procuração eletrônica)
+
+        Returns:
+            bool: True se selecionou ou não havia pop-up
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("👤 Verificando seleção de perfil de acesso...")
+            self.logger.info("=" * 70)
+
+            await asyncio.sleep(2)  # Aguardar pop-up aparecer
+
+            # Seletores para o pop-up de seleção de perfil
+            seletores_popup_perfil = [
+                # Texto específico do pop-up
+                "text='Selecione o tipo de acesso'",
+                "text='Como deseja acessar?'",
+                "text='Escolha seu perfil'",
+
+                # Container do modal
+                "[role='dialog']:has-text('perfil')",
+                ".modal:has-text('procurador')",
+                ".dialog:has-text('acesso')"
+            ]
+
+            # Verificar se o pop-up existe
+            popup_encontrado = False
+            for seletor in seletores_popup_perfil:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        popup_encontrado = True
+                        self.logger.info("✓ Pop-up de seleção de perfil detectado!")
+                        break
+                except:
+                    continue
+
+            if not popup_encontrado:
+                # Verificar de forma genérica procurando pelos textos
+                textos_na_pagina = await self.page.evaluate("""
+                    () => {
+                        const texto = document.body.innerText.toLowerCase();
+                        return {
+                            temPerfil: texto.includes('meu perfil') || texto.includes('perfil'),
+                            temProcurador: texto.includes('procurador') || texto.includes('procuração'),
+                            temSelecione: texto.includes('selecione') && (texto.includes('acesso') || texto.includes('perfil'))
+                        };
+                    }
+                """)
+
+                if textos_na_pagina['temPerfil'] and textos_na_pagina['temProcurador']:
+                    popup_encontrado = True
+                    self.logger.info("✓ Pop-up de seleção detectado via análise de texto!")
+
+            if not popup_encontrado:
+                self.logger.info("ℹ️  Pop-up de seleção de perfil não detectado (pode já estar na tela correta)")
+                return True
+
+            # Pop-up encontrado - procurar e clicar em "Sou Procurador"
+            self.logger.info("")
+            self.logger.info("🔍 Procurando opção 'Sou Procurador'...")
+
+            seletores_procurador = [
+                # Botões com texto
+                "button:has-text('Sou Procurador')",
+                "button:has-text('Procurador')",
+                "a:has-text('Sou Procurador')",
+                "a:has-text('Procurador')",
+
+                # Divs/cards clicáveis
+                "[role='button']:has-text('Procurador')",
+                ".option:has-text('Procurador')",
+                ".card:has-text('Procurador')",
+
+                # XPath
+                "//button[contains(text(), 'Procurador')]",
+                "//a[contains(text(), 'Procurador')]",
+
+                # IDs e classes comuns
+                "#btn-procurador",
+                ".btn-procurador",
+                "[data-perfil='procurador']"
+            ]
+
+            procurador_clicado = False
+
+            for seletor in seletores_procurador:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        texto = await elemento.inner_text()
+                        self.logger.info(f"✓ Encontrado: '{texto.strip()}'")
+
+                        # Clicar
+                        await elemento.click()
+                        procurador_clicado = True
+                        self.logger.info("✅ Clicado em 'Sou Procurador'!")
+
+                        # Aguardar navegação
+                        await asyncio.sleep(3)
+
+                        url_apos = self.page.url
+                        self.logger.info(f"📍 URL após seleção: {url_apos}")
+
+                        break
+
+                except Exception as e:
+                    continue
+
+            if not procurador_clicado:
+                # Não encontrou - tirar screenshot e listar opções disponíveis
+                self.logger.warning("⚠️  Não foi possível encontrar opção 'Sou Procurador'")
+
+                await self._screenshot_erro("popup_perfil_nao_encontrado")
+
+                # Listar todas as opções visíveis
+                opcoes = await self.page.evaluate("""
+                    () => {
+                        const opcoes = [];
+                        document.querySelectorAll('button, a, [role="button"]').forEach(el => {
+                            if (el.offsetParent !== null && el.innerText.trim()) {
+                                opcoes.push(el.innerText.trim().substring(0, 50));
+                            }
+                        });
+                        return opcoes.slice(0, 10);
+                    }
+                """)
+
+                self.logger.warning("Opções disponíveis na tela:")
+                for i, opcao in enumerate(opcoes, 1):
+                    self.logger.warning(f"  {i}. {opcao}")
+
+                # Tentar clicar em qualquer botão que pareça ser de procurador
+                self.logger.info("Tentando clicar em qualquer opção relacionada a 'procurador'...")
+                resultado = await self.page.evaluate("""
+                    () => {
+                        const elementos = document.querySelectorAll('button, a, [role="button"], .card, .option');
+                        for (const el of elementos) {
+                            const texto = el.innerText.toLowerCase();
+                            if (texto.includes('procurador') || texto.includes('procuração')) {
+                                el.click();
+                                return { success: true, texto: el.innerText };
+                            }
+                        }
+                        return { success: false };
+                    }
+                """)
+
+                if resultado.get('success'):
+                    self.logger.info(f"✓ Clicado via JavaScript em: '{resultado.get('texto')}'")
+                    await asyncio.sleep(3)
+                else:
+                    self.logger.warning("❌ Não foi possível clicar automaticamente")
+                    self.logger.warning("📌 Verifique o screenshot e me informe as opções disponíveis")
+
+            self.logger.info("=" * 70)
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao selecionar perfil: {str(e)}")
+            self.logger.exception("Traceback:")
+            await self._screenshot_erro("erro_selecao_perfil")
+            # Continuar mesmo com erro
+            return True
+
     async def _explorar_pagina_inicial(self) -> dict:
         """
         Explora e mapeia a estrutura da página inicial após login
@@ -1479,12 +1650,18 @@ class RoboFGTS:
                 return False
 
             # ============================================================
-            # EXPLORAÇÃO: Fechar pop-ups e mapear estrutura do site
+            # EXPLORAÇÃO: Selecionar perfil, fechar pop-ups e mapear estrutura do site
             # ============================================================
             self.logger.info("")
             self.logger.info("Etapa 3.5/4: Explorando site após login...")
 
-            # Fechar pop-ups/modais que possam ter aparecido
+            # PRIMEIRO: Selecionar perfil de procurador (CRUCIAL!)
+            try:
+                await self._selecionar_perfil_procurador()
+            except Exception as e:
+                self.logger.warning(f"Erro ao selecionar perfil: {str(e)}")
+
+            # SEGUNDO: Fechar outros pop-ups/modais que possam ter aparecido
             try:
                 await self._fechar_popups()
             except Exception as e:
