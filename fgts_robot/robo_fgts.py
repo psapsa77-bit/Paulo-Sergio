@@ -57,7 +57,10 @@ class RoboFGTS:
 
     def _setup_logging(self):
         """Configura o sistema de logging"""
-        log_file = config.LOGS_DIR / f"fgts_robot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        # Definir diretório de logs como atributo da instância
+        self.log_dir = config.LOGS_DIR
+
+        log_file = self.log_dir / f"fgts_robot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
         # Configurar logger
         self.logger = logging.getLogger("RoboFGTS")
@@ -1607,7 +1610,7 @@ class RoboFGTS:
 
             # Filtrar elementos que queremos clicar (ignorar header, footer, etc)
             elementos_para_explorar = []
-            textos_ignorar = ['trocar perfil', 'fgts digital', 'sair', 'logout']
+            textos_ignorar = ['trocar perfil', 'fgts digital', 'sair', 'logout', 'canais de atendimento']
 
             for elem in elementos_clicaveis:
                 texto_lower = elem['texto'].lower()
