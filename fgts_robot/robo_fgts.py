@@ -2,7 +2,9 @@
 Classe principal do Robô de Automação FGTS Digital
 """
 import asyncio
+import json
 import logging
+import os
 import random
 import sys
 import time
@@ -1512,6 +1514,283 @@ class RoboFGTS:
             self.logger.error(f"Erro ao explorar página: {str(e)}")
             return {}
 
+    async def _explorar_navegacao_completa(self) -> Dict[str, Any]:
+        """
+        Explora a navegação completa do site clicando em todos os elementos clicáveis
+
+        Para cada elemento:
+        1. Clica no elemento
+        2. Aguarda carregamento
+        3. Mapeia a nova página (URL, título, elementos)
+        4. Tira screenshot
+        5. Volta à página anterior
+        6. Salva informações
+
+        Returns:
+            dict: Mapeamento completo da navegação do site
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("🧭 EXPLORANDO NAVEGAÇÃO COMPLETA DO SITE...")
+            self.logger.info("=" * 70)
+
+            navegacao_completa = {
+                "url_inicial": self.page.url,
+                "timestamp": datetime.now().isoformat(),
+                "paginas_exploradas": []
+            }
+
+            # Pegar URL inicial para poder voltar
+            url_inicial = self.page.url
+
+            # Encontrar todos os elementos clicáveis da página inicial
+            self.logger.info("")
+            self.logger.info("🔍 Identificando elementos clicáveis na página inicial...")
+
+            elementos_clicaveis = await self.page.evaluate("""
+                () => {
+                    const elementos = [];
+
+                    // Seletores para elementos clicáveis
+                    const seletores = [
+                        'div.cardListItem',  // Cards de menu
+                        'div[class*="card"]',
+                        'a[href]',
+                        'button:not([disabled])',
+                        '[role="button"]'
+                    ];
+
+                    seletores.forEach(seletor => {
+                        document.querySelectorAll(seletor).forEach((el, index) => {
+                            // Verificar se visível
+                            const rect = el.getBoundingClientRect();
+                            const isVisible = rect.width > 0 && rect.height > 0 &&
+                                             window.getComputedStyle(el).display !== 'none';
+
+                            if (isVisible) {
+                                const texto = (el.innerText || el.textContent || '').trim();
+
+                                if (texto && texto.length > 0 && texto.length < 200) {
+                                    elementos.push({
+                                        seletor: seletor,
+                                        texto: texto.substring(0, 100),
+                                        id: el.id || '',
+                                        class: el.className || '',
+                                        href: el.href || '',
+                                        tag: el.tagName.toLowerCase(),
+                                        // Criar um seletor único para este elemento
+                                        seletorUnico: el.id ? `#${el.id}` :
+                                                     (el.className ? `.${el.className.split(' ')[0]}` : seletor)
+                                    });
+                                }
+                            }
+                        });
+                    });
+
+                    // Remover duplicatas baseado no texto
+                    const unicos = [];
+                    const textosVistos = new Set();
+
+                    elementos.forEach(el => {
+                        const chave = `${el.texto}_${el.tag}`;
+                        if (!textosVistos.has(chave)) {
+                            textosVistos.add(chave);
+                            unicos.push(el);
+                        }
+                    });
+
+                    return unicos;
+                }
+            """)
+
+            self.logger.info(f"✓ Encontrados {len(elementos_clicaveis)} elementos únicos para explorar")
+
+            # Filtrar elementos que queremos clicar (ignorar header, footer, etc)
+            elementos_para_explorar = []
+            textos_ignorar = ['trocar perfil', 'fgts digital', 'sair', 'logout']
+
+            for elem in elementos_clicaveis:
+                texto_lower = elem['texto'].lower()
+                # Ignorar elementos genéricos
+                if not any(ignorar in texto_lower for ignorar in textos_ignorar):
+                    elementos_para_explorar.append(elem)
+
+            self.logger.info(f"📋 Elementos a explorar (após filtros): {len(elementos_para_explorar)}")
+            self.logger.info("")
+
+            # Explorar cada elemento
+            for i, elemento in enumerate(elementos_para_explorar, 1):
+                try:
+                    self.logger.info("-" * 70)
+                    self.logger.info(f"🔍 Explorando {i}/{len(elementos_para_explorar)}: {elemento['texto'][:50]}")
+                    self.logger.info("-" * 70)
+
+                    # Voltar para página inicial antes de cada clique
+                    if self.page.url != url_inicial:
+                        await self.page.goto(url_inicial, wait_until="networkidle")
+                        await asyncio.sleep(2)
+
+                    # Tentar clicar no elemento
+                    clicou = False
+
+                    # Estratégia 1: Tentar pelo seletor único
+                    try:
+                        if elemento['id']:
+                            await self.page.click(f"#{elemento['id']}", timeout=5000)
+                            clicou = True
+                        elif elemento['class']:
+                            # Pegar primeira classe
+                            primeira_classe = elemento['class'].split()[0]
+                            # Clicar usando texto para garantir que é o elemento certo
+                            await self.page.click(f".{primeira_classe}:has-text('{elemento['texto'][:30]}')", timeout=5000)
+                            clicou = True
+                    except Exception as e:
+                        self.logger.debug(f"Tentativa 1 falhou: {str(e)[:50]}")
+
+                    # Estratégia 2: Tentar via JavaScript
+                    if not clicou:
+                        try:
+                            resultado = await self.page.evaluate(f"""
+                                () => {{
+                                    const texto = "{elemento['texto'][:30]}";
+                                    const elementos = document.querySelectorAll('div, a, button');
+
+                                    for (const el of elementos) {{
+                                        if (el.innerText && el.innerText.includes(texto)) {{
+                                            el.click();
+                                            return {{ success: true, texto: el.innerText.substring(0, 50) }};
+                                        }}
+                                    }}
+
+                                    return {{ success: false }};
+                                }}
+                            """)
+
+                            if resultado.get('success'):
+                                clicou = True
+                                self.logger.info(f"✓ Clicado via JavaScript: {resultado.get('texto')}")
+                        except Exception as e:
+                            self.logger.debug(f"Tentativa 2 falhou: {str(e)[:50]}")
+
+                    if not clicou:
+                        self.logger.warning(f"⚠️  Não foi possível clicar em: {elemento['texto'][:50]}")
+                        continue
+
+                    # Aguardar navegação/carregamento
+                    await asyncio.sleep(3)
+
+                    # Capturar informações da nova página
+                    url_apos_clique = self.page.url
+                    titulo_apos_clique = await self.page.title()
+
+                    self.logger.info(f"📍 Nova URL: {url_apos_clique}")
+                    self.logger.info(f"📄 Título: {titulo_apos_clique}")
+
+                    # Mapear elementos da nova página
+                    elementos_nova_pagina = await self.page.evaluate("""
+                        () => {
+                            const info = {
+                                links: [],
+                                botoes: [],
+                                tabelas: 0,
+                                formularios: 0
+                            };
+
+                            // Links
+                            document.querySelectorAll('a[href]').forEach(a => {
+                                const texto = (a.innerText || '').trim();
+                                if (texto && texto.length < 100) {
+                                    info.links.push({
+                                        texto: texto.substring(0, 50),
+                                        href: a.href
+                                    });
+                                }
+                            });
+
+                            // Botões
+                            document.querySelectorAll('button').forEach(btn => {
+                                const texto = (btn.innerText || '').trim();
+                                if (texto) {
+                                    info.botoes.push(texto.substring(0, 50));
+                                }
+                            });
+
+                            // Tabelas
+                            info.tabelas = document.querySelectorAll('table').length;
+
+                            // Formulários
+                            info.formularios = document.querySelectorAll('form').length;
+
+                            return info;
+                        }
+                    """)
+
+                    self.logger.info(f"  → {len(elementos_nova_pagina['links'])} links")
+                    self.logger.info(f"  → {len(elementos_nova_pagina['botoes'])} botões")
+                    self.logger.info(f"  → {elementos_nova_pagina['tabelas']} tabelas")
+                    self.logger.info(f"  → {elementos_nova_pagina['formularios']} formulários")
+
+                    # Tirar screenshot
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        nome_arquivo = elemento['texto'][:30].replace(' ', '_').replace('/', '_')
+                        screenshot_path = os.path.join(self.log_dir, f"nav_{i:02d}_{nome_arquivo}_{timestamp}.png")
+                        await self.page.screenshot(path=screenshot_path, full_page=True)
+                        self.logger.info(f"📸 Screenshot: {os.path.basename(screenshot_path)}")
+                    except Exception as e:
+                        self.logger.warning(f"Erro ao tirar screenshot: {str(e)[:50]}")
+                        screenshot_path = ""
+
+                    # Salvar informações
+                    navegacao_completa["paginas_exploradas"].append({
+                        "indice": i,
+                        "elemento_clicado": {
+                            "texto": elemento['texto'],
+                            "tag": elemento['tag'],
+                            "id": elemento['id'],
+                            "class": elemento['class']
+                        },
+                        "url": url_apos_clique,
+                        "titulo": titulo_apos_clique,
+                        "elementos": elementos_nova_pagina,
+                        "screenshot": screenshot_path
+                    })
+
+                    self.logger.info(f"✅ Exploração {i} concluída")
+
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao explorar elemento {i}: {str(e)}")
+                    continue
+
+            # Voltar para página inicial
+            self.logger.info("")
+            self.logger.info("🏠 Retornando à página inicial...")
+            await self.page.goto(url_inicial, wait_until="networkidle")
+            await asyncio.sleep(2)
+
+            # Salvar mapeamento completo em JSON
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                json_path = os.path.join(self.log_dir, f"navegacao_completa_{timestamp}.json")
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(navegacao_completa, f, ensure_ascii=False, indent=2)
+                self.logger.info(f"💾 Mapeamento completo salvo: {json_path}")
+            except Exception as e:
+                self.logger.warning(f"Erro ao salvar JSON: {str(e)}")
+
+            self.logger.info("")
+            self.logger.info("=" * 70)
+            self.logger.info(f"✅ Exploração completa finalizada!")
+            self.logger.info(f"   Total de páginas exploradas: {len(navegacao_completa['paginas_exploradas'])}")
+            self.logger.info("=" * 70)
+
+            return navegacao_completa
+
+        except Exception as e:
+            self.logger.error(f"Erro na exploração completa: {str(e)}")
+            self.logger.exception("Traceback:")
+            return {}
+
     async def _selecionar_empresa(self, cnpj: str) -> bool:
         """
         Seleciona uma empresa específica
@@ -1812,7 +2091,6 @@ class RoboFGTS:
 
                 # Salvar informações de exploração em arquivo JSON
                 if info_site:
-                    import json
                     exploracao_path = config.LOGS_DIR / f"exploracao_site_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                     with open(exploracao_path, 'w', encoding='utf-8') as f:
                         json.dump(info_site, f, indent=2, ensure_ascii=False)
@@ -1820,6 +2098,15 @@ class RoboFGTS:
 
             except Exception as e:
                 self.logger.warning(f"Erro durante exploração: {str(e)}")
+                self.logger.warning("Continuando com processamento...")
+
+            # Explorar navegação completa (clicar em todos os botões)
+            try:
+                self.logger.info("")
+                navegacao = await self._explorar_navegacao_completa()
+
+            except Exception as e:
+                self.logger.warning(f"Erro durante exploração de navegação: {str(e)}")
                 self.logger.warning("Continuando com processamento...")
 
             self.logger.info("")
