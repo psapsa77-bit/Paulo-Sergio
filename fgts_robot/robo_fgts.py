@@ -97,11 +97,16 @@ class RoboFGTS:
                 cert_data = f.read()
 
             # Validar formato PKCS12
-            pkcs12.load_key_and_certificates(
+            private_key, certificate, additional_certificates = pkcs12.load_key_and_certificates(
                 cert_data,
                 self.cert_password.encode() if self.cert_password else None,
                 backend=default_backend()
             )
+
+            # Armazenar para uso posterior
+            self._cert_key = private_key
+            self._cert_certificate = certificate
+            self._cert_additional = additional_certificates
 
             self.logger.info("Certificado validado com sucesso")
             return True
@@ -109,6 +114,64 @@ class RoboFGTS:
         except Exception as e:
             self.logger.error(f"Erro ao validar certificado: {str(e)}")
             return False
+
+    def _preparar_certificado_pem(self) -> tuple:
+        """
+        Converte certificado .pfx para arquivos .pem temporários
+
+        O Playwright precisa de certificado e chave em arquivos PEM separados.
+
+        Returns:
+            tuple: (cert_path, key_path) com caminhos dos arquivos temporários
+        """
+        try:
+            from cryptography.hazmat.primitives import serialization
+
+            # Caminhos dos arquivos temporários
+            temp_cert_path = config.CERT_DIR / "temp_cert.pem"
+            temp_key_path = config.CERT_DIR / "temp_key.pem"
+
+            # Escrever certificado em formato PEM
+            cert_pem = self._cert_certificate.public_bytes(
+                encoding=serialization.Encoding.PEM
+            )
+            with open(temp_cert_path, 'wb') as f:
+                f.write(cert_pem)
+
+            # Escrever chave privada em formato PEM
+            key_pem = self._cert_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            with open(temp_key_path, 'wb') as f:
+                f.write(key_pem)
+
+            self.logger.debug(f"Certificado PEM criado: {temp_cert_path}")
+            self.logger.debug(f"Chave PEM criada: {temp_key_path}")
+
+            return str(temp_cert_path), str(temp_key_path)
+
+        except Exception as e:
+            self.logger.error(f"Erro ao preparar certificado PEM: {str(e)}")
+            raise
+
+    def _limpar_certificados_temporarios(self):
+        """Remove arquivos temporários de certificado"""
+        try:
+            temp_cert = config.CERT_DIR / "temp_cert.pem"
+            temp_key = config.CERT_DIR / "temp_key.pem"
+
+            if temp_cert.exists():
+                temp_cert.unlink()
+                self.logger.debug("Certificado temporário removido")
+
+            if temp_key.exists():
+                temp_key.unlink()
+                self.logger.debug("Chave temporária removida")
+
+        except Exception as e:
+            self.logger.warning(f"Erro ao limpar certificados temporários: {str(e)}")
 
     async def _iniciar_navegador(self):
         """Inicializa o navegador Playwright com configurações de certificado"""
@@ -126,6 +189,10 @@ class RoboFGTS:
                 ]
             )
 
+            # Preparar certificado em formato PEM (Playwright precisa de cert + key separados)
+            self.logger.debug("Convertendo certificado .pfx para formato PEM...")
+            cert_path, key_path = self._preparar_certificado_pem()
+
             # Criar contexto com certificado
             self.context = await self.browser.new_context(
                 user_agent=config.USER_AGENT,
@@ -135,8 +202,8 @@ class RoboFGTS:
                 accept_downloads=True,
                 client_certificates=[{
                     "origin": config.FGTS_URL_BASE,
-                    "certPath": self.cert_path,
-                    "passphrase": self.cert_password
+                    "certPath": cert_path,
+                    "keyPath": key_path
                 }]
             )
 
@@ -161,6 +228,9 @@ class RoboFGTS:
                 await self.browser.close()
 
             self.logger.info("Navegador fechado")
+
+            # Limpar certificados temporários
+            self._limpar_certificados_temporarios()
 
         except Exception as e:
             self.logger.warning(f"Erro ao fechar navegador: {str(e)}")
