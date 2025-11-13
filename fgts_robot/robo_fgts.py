@@ -1619,9 +1619,46 @@ class RoboFGTS:
                 await self._screenshot_erro("emissao_guia_rapida_nao_encontrado")
                 return []
 
-            # Aguardar carregamento da página de emissão (aumentar tempo)
+            # Aguardar carregamento da página de emissão (SPA precisa de mais tempo)
             self.logger.info("⏳ Aguardando carregamento completo da página...")
-            await asyncio.sleep(5)
+            self.logger.info(f"📍 URL atual: {self.page.url}")
+
+            # Esperar tempo inicial
+            await asyncio.sleep(3)
+
+            # Tentar esperar por elementos específicos aparecerem
+            self.logger.info("⏳ Aguardando elementos da página carregarem...")
+            try:
+                # Esperar por qualquer label, input ou select aparecer (timeout 15 segundos)
+                await self.page.wait_for_selector('label, input, select, button', timeout=15000)
+                self.logger.info("✓ Elementos encontrados, página carregada!")
+            except Exception as e:
+                self.logger.warning(f"⚠️  Timeout aguardando elementos: {str(e)}")
+                self.logger.warning("Tentando continuar mesmo assim...")
+
+            # Esperar mais um pouco para garantir
+            await asyncio.sleep(3)
+
+            # Verificar se há iframes
+            self.logger.info("🔍 Verificando se há iframes na página...")
+            try:
+                frames_info = await self.page.evaluate("""
+                    () => {
+                        const iframes = document.querySelectorAll('iframe');
+                        return {
+                            total: iframes.length,
+                            urls: Array.from(iframes).map(f => f.src || f.name || 'sem URL')
+                        };
+                    }
+                """)
+                if frames_info['total'] > 0:
+                    self.logger.info(f"📦 Encontrados {frames_info['total']} iframes:")
+                    for i, url in enumerate(frames_info['urls'], 1):
+                        self.logger.info(f"   {i}. {url}")
+                else:
+                    self.logger.info("   Nenhum iframe encontrado")
+            except Exception as e:
+                self.logger.warning(f"Erro ao verificar iframes: {str(e)}")
 
             # Passo 3: ANÁLISE COMPLETA DA PÁGINA
             self.logger.info("")
@@ -1641,7 +1678,51 @@ class RoboFGTS:
             }
 
             try:
+                # DEBUG: Verificar HTML da página
+                self.logger.info("🔍 DEBUG: Verificando HTML da página...")
+                try:
+                    html_info = await self.page.evaluate("""
+                        () => {
+                            return {
+                                bodyLength: document.body ? document.body.innerHTML.length : 0,
+                                bodyText: document.body ? document.body.innerText.substring(0, 500) : '',
+                                elementsCount: document.querySelectorAll('*').length,
+                                hasAngular: !!window.angular || !!document.querySelector('[ng-app]'),
+                                hasReact: !!document.querySelector('[data-reactroot]'),
+                                hasVue: !!document.querySelector('[data-v-]')
+                            };
+                        }
+                    """)
+                    self.logger.info(f"   Tamanho do HTML body: {html_info['bodyLength']} caracteres")
+                    self.logger.info(f"   Total de elementos na página: {html_info['elementsCount']}")
+                    if html_info.get('hasAngular'):
+                        self.logger.info("   📦 Detectado: Angular")
+                    if html_info.get('hasReact'):
+                        self.logger.info("   📦 Detectado: React")
+                    if html_info.get('hasVue'):
+                        self.logger.info("   📦 Detectado: Vue")
+
+                    if html_info['bodyText']:
+                        self.logger.info(f"   Primeiros 200 caracteres do texto: {html_info['bodyText'][:200]}")
+                    else:
+                        self.logger.warning("   ⚠️  BODY está vazio!")
+
+                    # Salvar HTML completo para análise
+                    try:
+                        html_completo = await self.page.content()
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        html_path = os.path.join(self.log_dir, f"html_emissao_{timestamp}.html")
+                        with open(html_path, 'w', encoding='utf-8') as f:
+                            f.write(html_completo)
+                        self.logger.info(f"   💾 HTML completo salvo em: {html_path}")
+                    except Exception as e:
+                        self.logger.warning(f"Erro ao salvar HTML: {str(e)}")
+
+                except Exception as e:
+                    self.logger.error(f"Erro no debug HTML: {str(e)}")
+
                 # 1. COLETAR TODOS OS DADOS DA PÁGINA
+                self.logger.info("")
                 self.logger.info("📊 1. Coletando informações da página...")
                 dados_pagina = await self.page.evaluate("""
                     () => {
