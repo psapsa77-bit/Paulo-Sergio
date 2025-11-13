@@ -1337,7 +1337,133 @@ class RoboFGTS:
 
             self.logger.info("")
 
-            # 5. PROCURAR PALAVRAS-CHAVE RELACIONADAS A FGTS/GUIAS
+            # 5. PROCURAR TODOS OS ELEMENTOS CLICÁVEIS (ABRANGENTE)
+            self.logger.info("🔍 Procurando TODOS os elementos clicáveis...")
+            todos_clicaveis = await self.page.evaluate("""
+                () => {
+                    const clicaveis = [];
+                    // Procurar por: a, button, div/span com onclick, elementos com cursor pointer
+                    const seletores = 'a, button, [onclick], [role="button"], [class*="btn"], [class*="card"], [class*="link"], [class*="item"], div[style*="cursor"], span[style*="cursor"]';
+
+                    document.querySelectorAll(seletores).forEach((el) => {
+                        // Verificar se elemento está visível
+                        const rect = el.getBoundingClientRect();
+                        const isVisible = rect.width > 0 && rect.height > 0 &&
+                                         window.getComputedStyle(el).display !== 'none' &&
+                                         window.getComputedStyle(el).visibility !== 'hidden';
+
+                        if (isVisible) {
+                            const texto = el.innerText || el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '';
+                            const textoLimpo = texto.trim();
+
+                            if (textoLimpo) {
+                                clicaveis.push({
+                                    tipo: el.tagName.toLowerCase(),
+                                    texto: textoLimpo.substring(0, 100),
+                                    href: el.href || '',
+                                    id: el.id || '',
+                                    class: el.className || '',
+                                    onclick: el.onclick ? 'sim' : 'não',
+                                    ariaLabel: el.getAttribute('aria-label') || '',
+                                    dataAttributes: Object.keys(el.dataset || {}).length > 0 ?
+                                        JSON.stringify(el.dataset).substring(0, 100) : ''
+                                });
+                            }
+                        }
+                    });
+
+                    return clicaveis;
+                }
+            """)
+
+            info["todos_clicaveis"] = todos_clicaveis
+
+            if todos_clicaveis:
+                self.logger.info(f"✓ Encontrados {len(todos_clicaveis)} elementos clicáveis no total:")
+                for i, elem in enumerate(todos_clicaveis[:20], 1):
+                    self.logger.info(f"  {i}. [{elem['tipo'].upper()}] {elem['texto']}")
+                    if elem['href']:
+                        self.logger.info(f"      → {elem['href']}")
+                    if elem['id']:
+                        self.logger.info(f"      ID: {elem['id']}")
+                if len(todos_clicaveis) > 20:
+                    self.logger.info(f"  ... e mais {len(todos_clicaveis) - 20} elementos")
+            else:
+                self.logger.info("⚠️  Nenhum elemento clicável encontrado")
+
+            self.logger.info("")
+
+            # 6. PROCURAR ESPECIFICAMENTE POR ELEMENTOS COM "GUIAS"
+            self.logger.info("🔍 Procurando elementos específicos com 'GUIAS'...")
+            elementos_guias = await self.page.evaluate("""
+                () => {
+                    const guias = [];
+                    const todosElementos = document.querySelectorAll('*');
+
+                    todosElementos.forEach((el) => {
+                        const texto = (el.innerText || el.textContent || '').toLowerCase();
+                        const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                        const title = (el.getAttribute('title') || '').toLowerCase();
+                        const id = (el.id || '').toLowerCase();
+                        const className = (el.className || '').toLowerCase();
+
+                        // Verificar se contém "guia" em qualquer lugar
+                        if (texto.includes('guia') || ariaLabel.includes('guia') ||
+                            title.includes('guia') || id.includes('guia') || className.includes('guia')) {
+
+                            // Verificar se é clicável
+                            const tagName = el.tagName.toLowerCase();
+                            const isClickable = tagName === 'a' || tagName === 'button' ||
+                                               el.onclick || el.getAttribute('role') === 'button' ||
+                                               className.includes('btn') || className.includes('link') ||
+                                               className.includes('card') || className.includes('item');
+
+                            // Verificar se está visível
+                            const rect = el.getBoundingClientRect();
+                            const isVisible = rect.width > 0 && rect.height > 0;
+
+                            if (isVisible) {
+                                guias.push({
+                                    tipo: tagName,
+                                    texto: (el.innerText || el.textContent || '').trim().substring(0, 100),
+                                    href: el.href || '',
+                                    id: el.id || '',
+                                    class: el.className || '',
+                                    clicavel: isClickable ? 'SIM' : 'NÃO',
+                                    ariaLabel: el.getAttribute('aria-label') || '',
+                                    title: el.getAttribute('title') || '',
+                                    onclick: el.onclick ? 'sim' : 'não'
+                                });
+                            }
+                        }
+                    });
+
+                    return guias;
+                }
+            """)
+
+            info["elementos_guias"] = elementos_guias
+
+            if elementos_guias:
+                self.logger.info(f"✓ Encontrados {len(elementos_guias)} elementos relacionados a 'guias':")
+                for i, elem in enumerate(elementos_guias, 1):
+                    clicavel_icon = "🔘" if elem['clicavel'] == 'SIM' else "⚪"
+                    self.logger.info(f"  {i}. {clicavel_icon} [{elem['tipo'].upper()}] {elem['texto']}")
+                    if elem['href']:
+                        self.logger.info(f"      → URL: {elem['href']}")
+                    if elem['id']:
+                        self.logger.info(f"      → ID: {elem['id']}")
+                    if elem['class']:
+                        self.logger.info(f"      → Classes: {elem['class'][:100]}")
+                    if elem['ariaLabel']:
+                        self.logger.info(f"      → Aria-Label: {elem['ariaLabel']}")
+                    self.logger.info(f"      → Clicável: {elem['clicavel']}")
+            else:
+                self.logger.info("⚠️  Nenhum elemento com 'guias' encontrado")
+
+            self.logger.info("")
+
+            # 7. PROCURAR PALAVRAS-CHAVE RELACIONADAS A FGTS/GUIAS
             self.logger.info("🔍 Procurando seções relacionadas a FGTS...")
             palavras_chave = await self.page.evaluate("""
                 () => {
@@ -1363,6 +1489,17 @@ class RoboFGTS:
                         self.logger.info(f"  - '{palavra}': {count} ocorrências")
             else:
                 self.logger.info("⚠️  Nenhuma palavra-chave específica encontrada")
+
+            self.logger.info("")
+
+            # 8. TIRAR SCREENSHOT DA PÁGINA EXPLORADA
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = os.path.join(self.log_dir, f"pagina_inicial_{timestamp}.png")
+                await self.page.screenshot(path=screenshot_path, full_page=True)
+                self.logger.info(f"📸 Screenshot salvo: {screenshot_path}")
+            except Exception as e:
+                self.logger.warning(f"Erro ao tirar screenshot: {str(e)}")
 
             self.logger.info("")
             self.logger.info("=" * 70)
