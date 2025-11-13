@@ -28,6 +28,13 @@ HEADLESS = os.getenv("HEADLESS", "False").lower() in ("true", "1", "yes")
 BROWSER_TIMEOUT = int(os.getenv("TIMEOUT", "30000"))  # 30 segundos padrão
 SLOW_MO = int(os.getenv("SLOW_MO", "100"))  # Delay em ms entre ações
 
+# Tipo de navegador a usar:
+# - "chromium": Chromium empacotado do Playwright (padrão, mas não tem acesso a certificados do sistema)
+# - "chrome": Google Chrome instalado (RECOMENDADO - tem acesso aos certificados do Windows)
+# - "msedge": Microsoft Edge instalado (RECOMENDADO - tem acesso aos certificados do Windows)
+# - "firefox": Firefox (não suporta bem certificados digitais)
+BROWSER_TYPE = os.getenv("BROWSER_TYPE", "chrome").lower()
+
 # Configurações de CAPTCHA
 CAPTCHA_MANUAL_MODE = os.getenv("CAPTCHA_MANUAL", "True").lower() in ("true", "1", "yes")
 CAPTCHA_TIMEOUT = int(os.getenv("CAPTCHA_TIMEOUT", "300"))  # 5 minutos para resolver manualmente

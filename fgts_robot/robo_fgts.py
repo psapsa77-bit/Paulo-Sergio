@@ -212,59 +212,98 @@ class RoboFGTS:
         """Inicializa o navegador Playwright com configurações de certificado"""
         try:
             self.logger.info("Iniciando navegador...")
+            self.logger.info(f"Tipo de navegador: {config.BROWSER_TYPE}")
 
             playwright = await async_playwright().start()
-            self.browser = await playwright.chromium.launch(
-                headless=self.headless,
-                slow_mo=config.SLOW_MO,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox"
-                ]
-            )
 
-            # Preparar certificado em formato PEM (Playwright precisa de cert + key separados)
-            self.logger.info("Convertendo certificado .pfx para formato PEM...")
-            cert_path, key_path = self._preparar_certificado_pem()
+            # Selecionar o tipo de navegador
+            if config.BROWSER_TYPE == "chrome":
+                self.logger.info("🌐 Usando Google Chrome instalado (tem acesso aos certificados do sistema)")
+                browser_launcher = playwright.chromium
+                channel = "chrome"
+            elif config.BROWSER_TYPE == "msedge":
+                self.logger.info("🌐 Usando Microsoft Edge instalado (tem acesso aos certificados do sistema)")
+                browser_launcher = playwright.chromium
+                channel = "msedge"
+            elif config.BROWSER_TYPE == "firefox":
+                self.logger.warning("⚠️ Firefox não suporta bem certificados digitais. Use Chrome ou Edge.")
+                browser_launcher = playwright.firefox
+                channel = None
+            else:  # chromium (padrão)
+                self.logger.warning("⚠️ Chromium empacotado NÃO tem acesso aos certificados do sistema!")
+                self.logger.warning("⚠️ Configure BROWSER_TYPE=chrome ou BROWSER_TYPE=msedge no .env")
+                browser_launcher = playwright.chromium
+                channel = None
 
-            self.logger.info(f"Certificado preparado:")
-            self.logger.info(f"  - Cert: {cert_path}")
-            self.logger.info(f"  - Key: {key_path}")
-
-            # Criar contexto com certificado
-            # Configurar certificado para múltiplas origens possíveis do portal FGTS
-            client_certs = [
-                {
-                    "origin": "https://fgtsdigital.sistema.gov.br",
-                    "certPath": cert_path,
-                    "keyPath": key_path
-                },
-                {
-                    "origin": "https://*.sistema.gov.br",  # Qualquer subdomínio
-                    "certPath": cert_path,
-                    "keyPath": key_path
-                },
-                {
-                    "origin": "https://login.acesso.gov.br",  # Portal de login gov.br
-                    "certPath": cert_path,
-                    "keyPath": key_path
-                }
+            # Argumentos do navegador
+            browser_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
             ]
 
-            self.logger.info(f"Configurando certificado para {len(client_certs)} origens...")
+            # Lançar navegador
+            if channel:
+                # Usar navegador instalado (Chrome/Edge)
+                self.browser = await browser_launcher.launch(
+                    headless=self.headless,
+                    slow_mo=config.SLOW_MO,
+                    channel=channel,
+                    args=browser_args
+                )
+            else:
+                # Usar Chromium empacotado (com certificados via arquivos PEM)
+                self.browser = await browser_launcher.launch(
+                    headless=self.headless,
+                    slow_mo=config.SLOW_MO,
+                    args=browser_args
+                )
 
-            self.context = await self.browser.new_context(
-                user_agent=config.USER_AGENT,
-                viewport={"width": 1920, "height": 1080},
-                locale="pt-BR",
-                timezone_id="America/Sao_Paulo",
-                accept_downloads=True,
-                ignore_https_errors=False,  # Manter validação HTTPS
-                client_certificates=client_certs
-            )
+            # Criar contexto do navegador
+            context_options = {
+                "user_agent": config.USER_AGENT,
+                "viewport": {"width": 1920, "height": 1080},
+                "locale": "pt-BR",
+                "timezone_id": "America/Sao_Paulo",
+                "accept_downloads": True,
+                "ignore_https_errors": False
+            }
 
-            self.logger.info("✓ Certificado digital configurado no navegador")
+            # Se estiver usando Chromium empacotado, configurar certificados manualmente
+            if config.BROWSER_TYPE == "chromium":
+                self.logger.info("Configurando certificado manualmente para Chromium...")
+                cert_path, key_path = self._preparar_certificado_pem()
+
+                self.logger.info(f"Certificado preparado:")
+                self.logger.info(f"  - Cert: {cert_path}")
+                self.logger.info(f"  - Key: {key_path}")
+
+                # Configurar certificado para múltiplas origens
+                client_certs = [
+                    {
+                        "origin": "https://fgtsdigital.sistema.gov.br",
+                        "certPath": cert_path,
+                        "keyPath": key_path
+                    },
+                    {
+                        "origin": "https://*.sistema.gov.br",
+                        "certPath": cert_path,
+                        "keyPath": key_path
+                    },
+                    {
+                        "origin": "https://login.acesso.gov.br",
+                        "certPath": cert_path,
+                        "keyPath": key_path
+                    }
+                ]
+                context_options["client_certificates"] = client_certs
+                self.logger.info(f"✓ Certificado configurado para {len(client_certs)} origens")
+            else:
+                # Chrome/Edge usam certificados do sistema automaticamente
+                self.logger.info("✓ Navegador usará certificados instalados no sistema Windows")
+                self.logger.info("📌 Certifique-se de que seu certificado .pfx está instalado no Windows!")
+
+            self.context = await self.browser.new_context(**context_options)
 
             # Criar página
             self.page = await self.context.new_page()

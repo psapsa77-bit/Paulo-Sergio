@@ -22,6 +22,7 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 - ✅ **Interface Web** moderna e intuitiva (Streamlit)
 - ✅ **Interface CLI** completa para terminal
 - ✅ Autenticação automática com certificado digital A1 (.pfx)
+- ✅ **Suporta Chrome, Edge ou Chromium** (usa certificados do sistema Windows)
 - ✅ **Sistema inteligente de CAPTCHA** (resolução manual ou automática)
 - ✅ Gestão de múltiplas empresas via procuração eletrônica
 - ✅ Extração completa de guias FGTS (pagas e pendentes)
@@ -37,7 +38,8 @@ Robô de automação em Python para consulta de guias FGTS no portal FGTS Digita
 
 - Python 3.10 ou superior
 - Sistema Operacional: Windows, Linux ou macOS
-- Certificado Digital A1 (formato .pfx)
+- **Google Chrome ou Microsoft Edge** instalado (recomendado)
+- Certificado Digital A1 (formato .pfx) **instalado no Windows**
 - Acesso à internet
 
 ### Dependências Python
@@ -148,9 +150,18 @@ SLOW_MO=100     # Delay entre ações (ms)
 LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
-### 2. Adicione seu certificado
+### 2. Instale seu certificado no Windows
 
-Coloque seu certificado digital (.pfx) na pasta `certificados/`:
+**IMPORTANTE**: Para usar Chrome ou Edge (recomendado), você precisa **instalar o certificado no Windows**:
+
+1. **Clique duas vezes** no seu arquivo `.pfx`
+2. Siga o assistente de importação
+3. Digite a senha do certificado
+4. Selecione repositório **"Pessoal"**
+
+📖 **Guia completo passo a passo**: [INSTALAR_CERTIFICADO.md](fgts_robot/INSTALAR_CERTIFICADO.md)
+
+**Alternativamente**, se for usar Chromium empacotado (não recomendado), coloque o .pfx na pasta:
 
 ```bash
 cp /caminho/do/seu/certificado.pfx certificados/
