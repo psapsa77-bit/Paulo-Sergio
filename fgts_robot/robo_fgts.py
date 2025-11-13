@@ -1623,21 +1623,33 @@ class RoboFGTS:
             self.logger.info("⏳ Aguardando carregamento completo da página...")
             self.logger.info(f"📍 URL atual: {self.page.url}")
 
-            # Esperar tempo inicial
-            await asyncio.sleep(3)
+            # Esperar tempo inicial (aumentado para SPAs lentas)
+            self.logger.info("⏳ Aguardando 8 segundos iniciais...")
+            await asyncio.sleep(8)
 
             # Tentar esperar por elementos específicos aparecerem
-            self.logger.info("⏳ Aguardando elementos da página carregarem...")
-            try:
-                # Esperar por qualquer label, input ou select aparecer (timeout 15 segundos)
-                await self.page.wait_for_selector('label, input, select, button', timeout=15000)
-                self.logger.info("✓ Elementos encontrados, página carregada!")
-            except Exception as e:
-                self.logger.warning(f"⚠️  Timeout aguardando elementos: {str(e)}")
-                self.logger.warning("Tentando continuar mesmo assim...")
+            self.logger.info("⏳ Aguardando elementos da página carregarem (timeout: 30s)...")
+            tentativas = 0
+            elementos_encontrados = False
 
-            # Esperar mais um pouco para garantir
-            await asyncio.sleep(3)
+            while tentativas < 3 and not elementos_encontrados:
+                tentativas += 1
+                try:
+                    # Esperar por qualquer label, input ou select aparecer (timeout 30 segundos)
+                    await self.page.wait_for_selector('label, input, select, button, div[class*="form"]', timeout=30000)
+                    self.logger.info("✓ Elementos encontrados, página carregada!")
+                    elementos_encontrados = True
+                except Exception as e:
+                    if tentativas < 3:
+                        self.logger.warning(f"⚠️  Tentativa {tentativas} falhou, tentando novamente...")
+                        await asyncio.sleep(3)
+                    else:
+                        self.logger.warning(f"⚠️  Timeout aguardando elementos após {tentativas} tentativas")
+                        self.logger.warning("Tentando continuar mesmo assim...")
+
+            # Esperar mais um pouco para garantir que tudo carregou
+            self.logger.info("⏳ Aguardando mais 8 segundos para garantir carregamento completo...")
+            await asyncio.sleep(8)
 
             # Verificar se há iframes
             self.logger.info("🔍 Verificando se há iframes na página...")
