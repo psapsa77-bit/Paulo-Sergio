@@ -892,11 +892,20 @@ class RoboFGTS:
             await self._delay_aleatorio()
 
             # ========================================================================
-            # PASSO 3: CLICAR EM ENTRAR (SE NECESSÁRIO)
+            # PASSO 3: SELECIONAR PERFIL "SOU PROCURADOR"
             # ========================================================================
-            self.logger.info("Tentando clicar em 'Entrar' (se houver botão)...")
-            if not await self._clicar_com_retry(config.SELECTORS["login"]["btn_entrar"]):
-                self.logger.info("✓ Botão 'Entrar' não encontrado - login pode ter sido automático")
+            self.logger.info("=" * 70)
+            self.logger.info("PASSO 3: Verificando seleção de perfil...")
+            self.logger.info("=" * 70)
+
+            # Após selecionar certificado, aparece pop-up perguntando:
+            # "Meu Perfil" ou "Sou Procurador"
+            # Precisamos clicar em "Sou Procurador" para acessar empresas via procuração
+            try:
+                await self._selecionar_perfil_procurador()
+            except Exception as e:
+                self.logger.warning(f"Erro ao selecionar perfil de procurador: {str(e)}")
+                # Continua mesmo se falhar - pode ser que já tenha selecionado
 
             # Aguardar carregamento da página inicial
             await asyncio.sleep(3)
@@ -1650,18 +1659,14 @@ class RoboFGTS:
                 return False
 
             # ============================================================
-            # EXPLORAÇÃO: Selecionar perfil, fechar pop-ups e mapear estrutura do site
+            # EXPLORAÇÃO: Fechar pop-ups e mapear estrutura do site
             # ============================================================
             self.logger.info("")
             self.logger.info("Etapa 3.5/4: Explorando site após login...")
 
-            # PRIMEIRO: Selecionar perfil de procurador (CRUCIAL!)
-            try:
-                await self._selecionar_perfil_procurador()
-            except Exception as e:
-                self.logger.warning(f"Erro ao selecionar perfil: {str(e)}")
+            # NOTA: Seleção de perfil "Sou Procurador" agora é feita durante o login (PASSO 3)
 
-            # SEGUNDO: Fechar outros pop-ups/modais que possam ter aparecido
+            # PRIMEIRO: Fechar outros pop-ups/modais que possam ter aparecido
             try:
                 await self._fechar_popups()
             except Exception as e:
