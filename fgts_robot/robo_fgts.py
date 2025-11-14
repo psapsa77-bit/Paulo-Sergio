@@ -1655,6 +1655,342 @@ class RoboFGTS:
             self.logger.exception("Traceback:")
             return False
 
+    def _gerar_relatorio_html(self, dados: Dict[str, Any]) -> str:
+        """
+        Gera relatório HTML visual com os resultados do processamento
+
+        Args:
+            dados: Dicionário com os dados do resultado
+
+        Returns:
+            str: Conteúdo HTML formatado
+        """
+        timestamp = dados.get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        total_empresas = dados.get('total_empresas_processadas', 0)
+        empresas_com_comp = dados.get('empresas_com_competencias', 0)
+        empresas_sem_comp = dados.get('empresas_sem_competencias', 0)
+        empresas_erro = dados.get('empresas_com_erro', 0)
+        competencias_unicas = dados.get('competencias_unicas', [])
+        resultados_empresas = dados.get('resultados_por_empresa', [])
+
+        html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Competências FGTS - {timestamp}</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #1f4788 0%, #4a90e2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }}
+        .header h1 {{
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }}
+        .header p {{
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }}
+        .metrics {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            background: #f8f9fa;
+        }}
+        .metric-card {{
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }}
+        .metric-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }}
+        .metric-card .icon {{
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }}
+        .metric-card .number {{
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #1f4788;
+            margin: 10px 0;
+        }}
+        .metric-card .label {{
+            color: #666;
+            font-size: 1rem;
+        }}
+        .content {{
+            padding: 40px;
+        }}
+        .section {{
+            margin-bottom: 40px;
+        }}
+        .section-title {{
+            font-size: 1.8rem;
+            color: #1f4788;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #4a90e2;
+        }}
+        .empresa-card {{
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }}
+        .empresa-card:hover {{
+            border-color: #4a90e2;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }}
+        .empresa-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }}
+        .empresa-nome {{
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #333;
+            flex: 1;
+        }}
+        .empresa-cnpj {{
+            background: #f0f0f0;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-family: 'Courier New', monospace;
+            color: #555;
+            margin-left: 10px;
+        }}
+        .status-badge {{
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-top: 10px;
+        }}
+        .status-sucesso {{
+            background: #d4edda;
+            color: #155724;
+        }}
+        .status-sem-competencias {{
+            background: #fff3cd;
+            color: #856404;
+        }}
+        .status-erro {{
+            background: #f8d7da;
+            color: #721c24;
+        }}
+        .competencias-list {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }}
+        .competencia-item {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }}
+        .competencias-unicas {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }}
+        .competencia-unica {{
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }}
+        .info-message {{
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 20px;
+            border-radius: 5px;
+            color: #0c5460;
+        }}
+        .footer {{
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }}
+        @media print {{
+            body {{
+                background: white;
+            }}
+            .container {{
+                box-shadow: none;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Relatório de Competências FGTS</h1>
+            <p>Gerado em: {timestamp}</p>
+        </div>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="icon">🏢</div>
+                <div class="number">{total_empresas}</div>
+                <div class="label">Total de Empresas</div>
+            </div>
+            <div class="metric-card">
+                <div class="icon">✅</div>
+                <div class="number">{empresas_com_comp}</div>
+                <div class="label">Com Competências</div>
+            </div>
+            <div class="metric-card">
+                <div class="icon">📭</div>
+                <div class="number">{empresas_sem_comp}</div>
+                <div class="label">Sem Competências</div>
+            </div>
+            <div class="metric-card">
+                <div class="icon">📅</div>
+                <div class="number">{len(competencias_unicas)}</div>
+                <div class="label">Competências Únicas</div>
+            </div>
+        </div>
+
+        <div class="content">
+"""
+
+        # Seção de Competências Únicas
+        if competencias_unicas:
+            html += """
+            <div class="section">
+                <h2 class="section-title">📅 Competências Únicas Encontradas</h2>
+                <div class="competencias-unicas">
+"""
+            for comp in competencias_unicas:
+                html += f'                    <div class="competencia-unica">📆 {comp}</div>\n'
+            html += """
+                </div>
+            </div>
+"""
+
+        # Seção de Empresas
+        html += """
+            <div class="section">
+                <h2 class="section-title">🏢 Detalhes por Empresa</h2>
+"""
+
+        if resultados_empresas:
+            for resultado in resultados_empresas:
+                nome = resultado.get('nome', '')
+                cnpj = resultado.get('cnpj', '')
+                status = resultado.get('status', '')
+                sucesso = resultado.get('sucesso', False)
+                total_comp = resultado.get('total_competencias', 0)
+                competencias = resultado.get('competencias', [])
+
+                # Formatar CNPJ
+                cnpj_formatado = cnpj
+                if len(cnpj) == 14:
+                    cnpj_formatado = f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
+
+                # Definir classe do status
+                if not sucesso:
+                    status_class = "status-erro"
+                elif total_comp > 0:
+                    status_class = "status-sucesso"
+                else:
+                    status_class = "status-sem-competencias"
+
+                html += f"""
+                <div class="empresa-card">
+                    <div class="empresa-header">
+                        <div class="empresa-nome">📋 {nome}</div>
+                        <div class="empresa-cnpj">{cnpj_formatado}</div>
+                    </div>
+                    <div class="status-badge {status_class}">{status}</div>
+"""
+
+                if total_comp > 0:
+                    html += f"""
+                    <div class="competencias-list">
+"""
+                    for comp in competencias:
+                        html += f'                        <div class="competencia-item">📆 {comp}</div>\n'
+                    html += """
+                    </div>
+"""
+                elif sucesso:
+                    html += """
+                    <div class="info-message" style="margin-top: 15px;">
+                        ℹ️ Nenhuma guia em aberto para esta empresa
+                    </div>
+"""
+
+                html += """
+                </div>
+"""
+        else:
+            html += """
+                <div class="info-message">
+                    ℹ️ Nenhuma empresa foi processada
+                </div>
+"""
+
+        html += """
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Robô FGTS Digital</strong></p>
+            <p>Automação de consulta de guias FGTS com certificado digital</p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+        return html
+
     async def _buscar_competencias_em_aberto(self) -> List[str]:
         """
         Navega até Gestão de Guias > Emissão de Guia Rápida
@@ -3387,40 +3723,21 @@ class RoboFGTS:
             except Exception as e:
                 self.logger.warning(f"Erro ao salvar JSON: {str(e)}")
 
-            # Salvar resultado em Excel
+            # Salvar resultado em HTML
             try:
-                import pandas as pd
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                html_path = config.LOGS_DIR / f"competencias_em_aberto_{timestamp}.html"
 
-                # Criar DataFrame com todas as empresas e suas competências
-                linhas = []
-                for resultado in self.resultados_por_empresa:
-                    if resultado['total_competencias'] > 0:
-                        for comp in resultado['competencias']:
-                            linhas.append({
-                                'Empresa': resultado['nome'],
-                                'CNPJ': resultado['cnpj'],
-                                'Competência': comp,
-                                'Status': resultado['status']
-                            })
-                    else:
-                        linhas.append({
-                            'Empresa': resultado['nome'],
-                            'CNPJ': resultado['cnpj'],
-                            'Competência': '-',
-                            'Status': resultado['status']
-                        })
+                # Gerar HTML
+                html_content = self._gerar_relatorio_html(dados_resultado)
 
-                if linhas:
-                    df = pd.DataFrame(linhas)
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    excel_path = config.LOGS_DIR / f"competencias_em_aberto_{timestamp}.xlsx"
-                    df.to_excel(excel_path, index=False, sheet_name='Competências')
-                    self.logger.info(f"📊 Resultado salvo em Excel: {excel_path}")
-            except ImportError:
-                self.logger.warning("⚠️  Pandas não instalado. Excel não foi gerado.")
-                self.logger.warning("   Instale com: pip install pandas openpyxl")
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+
+                self.logger.info(f"📊 Resultado salvo em HTML: {html_path}")
             except Exception as e:
-                self.logger.warning(f"Erro ao salvar Excel: {str(e)}")
+                self.logger.warning(f"Erro ao salvar HTML: {str(e)}")
+                self.logger.exception("Traceback:")
 
             self.logger.info("")
             self.logger.info("="*70)

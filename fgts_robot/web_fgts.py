@@ -368,16 +368,16 @@ def main():
                                     st.session_state.competencias_data = robo.dados_resultado
                                     adicionar_log(f"✅ {len(robo.competencias_encontradas)} competências encontradas")
 
-                                # Buscar arquivo de resultado mais recente
-                                arquivos_resultado = sorted(
-                                    config.RESULTS_DIR.glob("*.xlsx"),
+                                # Buscar arquivo HTML de resultado mais recente
+                                arquivos_html = sorted(
+                                    config.LOGS_DIR.glob("competencias_em_aberto_*.html"),
                                     key=lambda x: x.stat().st_mtime,
                                     reverse=True
                                 )
 
-                                if arquivos_resultado:
-                                    st.session_state.resultados = arquivos_resultado[0]
-                                    adicionar_log(f"Arquivo gerado: {arquivos_resultado[0].name}")
+                                if arquivos_html:
+                                    st.session_state.resultados = arquivos_html[0]
+                                    adicionar_log(f"Arquivo HTML gerado: {arquivos_html[0].name}")
                             else:
                                 adicionar_log("❌ Processamento falhou")
                                 st.error("❌ Processamento falhou. Verifique os logs.")
@@ -513,27 +513,27 @@ def main():
                 )
 
             with col2:
-                # Download Excel (se existir)
-                arquivos_excel = sorted(
-                    config.LOGS_DIR.glob("competencias_em_aberto_*.xlsx"),
+                # Download HTML (se existir)
+                arquivos_html = sorted(
+                    config.LOGS_DIR.glob("competencias_em_aberto_*.html"),
                     key=lambda x: x.stat().st_mtime,
                     reverse=True
                 )
-                if arquivos_excel:
-                    with open(arquivos_excel[0], 'rb') as f:
+                if arquivos_html:
+                    with open(arquivos_html[0], 'r', encoding='utf-8') as f:
                         st.download_button(
-                            label="📥 Baixar Excel",
+                            label="📥 Baixar HTML",
                             data=f.read(),
-                            file_name=arquivos_excel[0].name,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            file_name=arquivos_html[0].name,
+                            mime="text/html",
                             use_container_width=True
                         )
 
             st.divider()
 
-        # Arquivos Excel antigos (se existirem)
-        if st.session_state.resultados:
-            st.success(f"📊 Arquivo gerado: {st.session_state.resultados.name}")
+        # Arquivo HTML gerado (se existir)
+        if st.session_state.resultados and st.session_state.resultados.suffix == '.html':
+            st.success(f"📊 Arquivo HTML gerado: {st.session_state.resultados.name}")
 
             col1, col2 = st.columns(2)
 
@@ -544,23 +544,25 @@ def main():
                 tamanho = st.session_state.resultados.stat().st_size / 1024
                 st.metric("Tamanho", f"{tamanho:.2f} KB")
 
-            # Preview do Excel
+            # Preview do HTML (renderizar iframe)
             try:
-                df = pd.read_excel(st.session_state.resultados, sheet_name=0)
-                st.subheader("Preview dos Dados")
-                st.dataframe(df, use_container_width=True)
+                with open(st.session_state.resultados, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+
+                st.subheader("Preview do Relatório")
+                st.components.v1.html(html_content, height=800, scrolling=True)
             except Exception as e:
                 st.warning(f"Não foi possível carregar preview: {str(e)}")
 
             # Download
             st.divider()
 
-            with open(st.session_state.resultados, 'rb') as f:
+            with open(st.session_state.resultados, 'r', encoding='utf-8') as f:
                 st.download_button(
-                    label="📥 BAIXAR ARQUIVO EXCEL",
+                    label="📥 BAIXAR ARQUIVO HTML",
                     data=f.read(),
                     file_name=st.session_state.resultados.name,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    mime="text/html",
                     use_container_width=True
                 )
 
@@ -568,17 +570,17 @@ def main():
         if not st.session_state.competencias_data and not st.session_state.resultados:
             st.info("📭 Nenhum resultado disponível ainda. Execute um processamento na aba '🚀 Processar' para visualizar as competências em aberto.")
 
-            # Listar resultados anteriores
-            arquivos_anteriores = sorted(
-                config.RESULTS_DIR.glob("*.xlsx"),
+            # Listar resultados anteriores (HTML)
+            arquivos_anteriores_html = sorted(
+                config.LOGS_DIR.glob("competencias_em_aberto_*.html"),
                 key=lambda x: x.stat().st_mtime,
                 reverse=True
             )
 
-            if arquivos_anteriores:
-                st.subheader("📁 Resultados Anteriores")
+            if arquivos_anteriores_html:
+                st.subheader("📁 Resultados Anteriores (HTML)")
 
-                for arquivo in arquivos_anteriores[:10]:  # Mostrar últimos 10
+                for arquivo in arquivos_anteriores_html[:10]:  # Mostrar últimos 10
                     col1, col2, col3 = st.columns([3, 1, 1])
 
                     with col1:
@@ -589,11 +591,12 @@ def main():
                         st.text(data_mod.strftime("%d/%m/%Y %H:%M"))
 
                     with col3:
-                        with open(arquivo, 'rb') as f:
+                        with open(arquivo, 'r', encoding='utf-8') as f:
                             st.download_button(
                                 "⬇️",
                                 data=f.read(),
                                 file_name=arquivo.name,
+                                mime="text/html",
                                 key=f"download_{arquivo.name}"
                             )
 
