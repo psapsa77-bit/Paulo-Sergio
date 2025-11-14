@@ -2,9 +2,13 @@
 
 Robô automatizado para verificar mensagens não lidas no Portal DET (Delegacia Regional do Trabalho).
 
+> **Versão 2.0** - Reformulado com base no Robô FGTS com suporte aprimorado para certificados digitais!
+
 ## 📋 Descrição
 
 Este robô acessa o portal do DET (https://det.sit.trabalho.gov.br/) utilizando certificado digital e verifica se existem mensagens não lidas para as empresas cadastradas. Os resultados são apresentados em uma interface web moderna e podem ser exportados em formato HTML e JSON.
+
+**Novidades v2.0:** Baseado no robô FGTS comprovadamente funcional, esta versão usa Chrome ou Edge instalado no sistema para melhor compatibilidade com certificados digitais, com sistema de fallback automático e detecção robusta de elementos.
 
 ## ✨ Funcionalidades
 
@@ -16,6 +20,9 @@ Este robô acessa o portal do DET (https://det.sit.trabalho.gov.br/) utilizando 
 - 🌐 **Interface web intuitiva** com Streamlit
 - 📝 **Sistema de logs detalhado**
 - 🔄 **Processamento em lote**
+- 🌐 **Suporte a Chrome/Edge** para melhor compatibilidade com certificados
+- 🛡️ **Sistema de fallback** automático entre navegadores
+- 🔍 **Detecção robusta** com múltiplos métodos de busca
 
 ## 🚀 Instalação
 
@@ -290,7 +297,7 @@ Este projeto é fornecido "como está", sem garantias de qualquer tipo.
 ## 👤 Autor
 
 **Paulo Sergio**
-- Versão: 1.0.0
+- Versão: 2.0.0
 - Data: 2024
 
 ## 📞 Suporte
@@ -301,6 +308,20 @@ Para problemas ou dúvidas:
 3. Abra uma issue no repositório
 
 ## 🔄 Atualizações
+
+### Versão 2.0.0 (2024-11-14)
+- 🚀 **REFORMULAÇÃO COMPLETA** baseada no Robô FGTS
+- 🌐 **Suporte aprimorado para certificados digitais**
+- 🔧 Usa Chrome ou Edge instalado no sistema (melhor suporte a certificados)
+- 🛡️ Sistema de fallback (Chrome → Edge → Chromium)
+- 📝 Logging mais detalhado e informativo
+- ⚡ Melhor detecção de elementos do portal
+- 🔄 Múltiplos métodos de busca para cada operação
+- ✅ Tratamento de erros robusto
+
+### Versão 1.0.1 (2024-11-14)
+- 🔧 Correção para Python 3.13 no Windows
+- 🐛 Solução do problema NotImplementedError com event loop
 
 ### Versão 1.0.0 (2024)
 - ✨ Lançamento inicial

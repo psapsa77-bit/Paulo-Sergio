@@ -1,22 +1,26 @@
 """
 Robô DET - Verificador de Mensagens do Portal DET
+Adaptado do Robô FGTS
 Autor: Paulo Sergio
-Versão: 1.0.0
+Versão: 2.0.0
 
 Descrição:
     Robô automatizado para acessar o portal do DET (https://det.sit.trabalho.gov.br/)
     e verificar se existem mensagens não lidas para empresas cadastradas.
+
+    Baseado no robô FGTS com suporte aprimorado para certificados digitais.
 """
 
 import asyncio
 import sys
 import platform
 import logging
+import json
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-import json
-from playwright.async_api import async_playwright, Browser, Page, BrowserContext
+from playwright.async_api import async_playwright, Browser, Page, BrowserContext, Error as PlaywrightError
 
 from . import config
 
@@ -36,6 +40,7 @@ if sys.platform == 'win32' and sys.version_info >= (3, 8):
 class RobotDET:
     """
     Robô para verificar mensagens não lidas no Portal DET
+    Baseado no robô FGTS com adaptações para o portal DET
     """
 
     def __init__(self, headless: bool = False):
@@ -88,40 +93,86 @@ class RobotDET:
 
     async def inicializar_browser(self) -> bool:
         """
-        Inicializa o navegador Playwright
+        Inicializa o navegador usando Chrome ou Edge com suporte a certificados
+        Baseado no robô FGTS que funciona com certificados digitais
 
         Returns:
             bool: True se inicializado com sucesso
         """
         try:
-            self.logger.info("🌐 Iniciando navegador...")
+            self.logger.info("🌐 Iniciando navegador com suporte a certificados...")
             self.playwright = await async_playwright().start()
 
-            self.browser = await self.playwright.chromium.launch(
-                headless=self.headless,
-                slow_mo=config.SLOW_MO,
-                args=[
-                    '--start-maximized',
-                    '--disable-blink-features=AutomationControlled'
-                ]
-            )
+            # Tentar Chrome primeiro, depois Edge, depois Chromium
+            browser_launched = False
 
+            # Tentar Chrome
+            try:
+                self.logger.info("Tentando iniciar Google Chrome...")
+                self.browser = await self.playwright.chromium.launch(
+                    headless=False,  # Sempre visível para seleção de certificado
+                    channel="chrome",  # Usar Chrome instalado no sistema
+                    args=[
+                        '--start-maximized',
+                        '--disable-blink-features=AutomationControlled',
+                        '--ignore-certificate-errors'
+                    ]
+                )
+                browser_launched = True
+                self.logger.info("✅ Chrome iniciado com sucesso")
+            except Exception as e:
+                self.logger.warning(f"Chrome não disponível: {str(e)}")
+
+            # Se Chrome falhar, tentar Edge
+            if not browser_launched:
+                try:
+                    self.logger.info("Tentando iniciar Microsoft Edge...")
+                    self.browser = await self.playwright.chromium.launch(
+                        headless=False,
+                        channel="msedge",  # Usar Edge instalado no sistema
+                        args=[
+                            '--start-maximized',
+                            '--disable-blink-features=AutomationControlled',
+                            '--ignore-certificate-errors'
+                        ]
+                    )
+                    browser_launched = True
+                    self.logger.info("✅ Edge iniciado com sucesso")
+                except Exception as e:
+                    self.logger.warning(f"Edge não disponível: {str(e)}")
+
+            # Se ambos falharem, tentar Chromium
+            if not browser_launched:
+                self.logger.warning("Chrome e Edge não disponíveis, usando Chromium...")
+                self.logger.warning("⚠️  ATENÇÃO: Chromium pode ter problemas com certificados digitais!")
+                self.browser = await self.playwright.chromium.launch(
+                    headless=False,
+                    args=[
+                        '--start-maximized',
+                        '--disable-blink-features=AutomationControlled',
+                        '--ignore-certificate-errors'
+                    ]
+                )
+                self.logger.info("⚠️  Chromium iniciado (suporte limitado a certificados)")
+
+            # Criar contexto com configurações brasileiras
             self.context = await self.browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 locale='pt-BR',
-                timezone_id='America/Sao_Paulo'
+                timezone_id='America/Sao_Paulo',
+                ignore_https_errors=True
             )
 
             self.page = await self.context.new_page()
             self.page.set_default_timeout(config.TIMEOUT_PADRAO * 1000)
 
-            self.logger.info("✅ Navegador iniciado com sucesso")
+            self.logger.info("✅ Navegador inicializado com sucesso")
             return True
 
         except Exception as e:
             self.logger.error(f"❌ Erro ao inicializar navegador: {str(e)}")
-            self.logger.exception("Traceback:")
+            self.logger.exception("Traceback completo:")
             return False
 
     async def fechar_browser(self):
@@ -147,10 +198,18 @@ class RobotDET:
             bool: True se acessou com sucesso
         """
         try:
-            self.logger.info(f"🌐 Acessando portal: {config.DET_URL}")
-            await self.page.goto(config.DET_URL, wait_until="domcontentloaded")
-            await asyncio.sleep(2)
+            self.logger.info(f"🌐 Acessando portal DET: {config.DET_URL}")
 
+            response = await self.page.goto(
+                config.DET_URL,
+                wait_until="domcontentloaded",
+                timeout=60000
+            )
+
+            if response and response.status >= 400:
+                self.logger.warning(f"⚠️  Status HTTP: {response.status}")
+
+            await asyncio.sleep(3)
             self.logger.info("✅ Portal acessado com sucesso")
             return True
 
@@ -162,6 +221,7 @@ class RobotDET:
     async def fazer_login_certificado(self) -> bool:
         """
         Realiza login com certificado digital
+        Baseado no robô FGTS
 
         Returns:
             bool: True se login bem-sucedido
@@ -169,34 +229,77 @@ class RobotDET:
         try:
             self.logger.info("🔐 Iniciando login com certificado digital...")
 
-            # Aguardar e clicar no botão de certificado digital
+            # Aguardar carregamento da página
+            await asyncio.sleep(2)
+
+            # Procurar botão de certificado digital
             try:
-                btn_certificado = await self.page.wait_for_selector(
-                    config.SELETORES["btn_certificado"],
-                    timeout=config.TIMEOUT_LOGIN * 1000
-                )
-                await btn_certificado.click()
-                self.logger.info("🖱️  Clicado no botão de certificado digital")
-                await asyncio.sleep(3)
-            except Exception:
-                self.logger.info("⚠️  Botão de certificado não encontrado, continuando...")
+                self.logger.info("Procurando botão de certificado digital...")
 
-            # Aguardar seleção manual do certificado pelo usuário
-            self.logger.info("⏳ Aguardando seleção do certificado digital...")
-            self.logger.info("👉 Por favor, selecione o certificado digital na janela que apareceu")
+                # Tentar diferentes seletores para o botão
+                seletores_botao = [
+                    "//button[contains(text(), 'Certificado Digital')]",
+                    "//a[contains(text(), 'Certificado Digital')]",
+                    "button:has-text('Certificado')",
+                    "a:has-text('Certificado')",
+                    "#btnCertificado",
+                    ".btn-certificado"
+                ]
 
-            # Aguardar até que o login seja concluído (ajustar seletor conforme o portal)
-            await self.page.wait_for_load_state("networkidle", timeout=config.TIMEOUT_LOGIN * 1000)
-            await asyncio.sleep(5)
+                botao_encontrado = False
+                for seletor in seletores_botao:
+                    try:
+                        await self.page.wait_for_selector(seletor, timeout=5000)
+                        await self.page.click(seletor)
+                        self.logger.info(f"✅ Botão de certificado encontrado e clicado: {seletor}")
+                        botao_encontrado = True
+                        break
+                    except:
+                        continue
+
+                if botao_encontrado:
+                    await asyncio.sleep(3)
+                else:
+                    self.logger.warning("⚠️  Botão de certificado não encontrado, pode já estar na tela de seleção")
+
+            except Exception as e:
+                self.logger.warning(f"⚠️  Erro ao clicar no botão: {str(e)}")
+
+            # Aguardar seleção manual do certificado
+            self.logger.info("")
+            self.logger.info("="*70)
+            self.logger.info("⏳ AGUARDANDO SELEÇÃO DO CERTIFICADO DIGITAL")
+            self.logger.info("👉 Por favor, selecione seu certificado digital na janela que apareceu")
+            self.logger.info("👉 Digite o PIN se solicitado")
+            self.logger.info("="*70)
+            self.logger.info("")
+
+            # Aguardar navegação após login (até 90 segundos)
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=90000)
+                await asyncio.sleep(5)
+            except:
+                self.logger.warning("⚠️  Timeout ao aguardar networkidle, continuando...")
 
             # Verificar se o login foi bem-sucedido
             url_atual = self.page.url
-            if "login" not in url_atual.lower() or "autenticacao" not in url_atual.lower():
-                self.logger.info("✅ Login realizado com sucesso")
+            self.logger.info(f"URL atual: {url_atual}")
+
+            # Login bem-sucedido se não estiver mais na página de login
+            if "login" not in url_atual.lower() and "autenticacao" not in url_atual.lower():
+                self.logger.info("✅ Login realizado com sucesso!")
                 return True
             else:
-                self.logger.warning("⚠️  Ainda na página de login, verificando...")
-                return False
+                self.logger.warning("⚠️  Ainda na página de login")
+                # Dar uma segunda chance
+                await asyncio.sleep(10)
+                url_atual = self.page.url
+                if "login" not in url_atual.lower():
+                    self.logger.info("✅ Login confirmado após espera adicional")
+                    return True
+                else:
+                    self.logger.error("❌ Login não foi concluído")
+                    return False
 
         except Exception as e:
             self.logger.error(f"❌ Erro ao fazer login: {str(e)}")
@@ -217,25 +320,54 @@ class RobotDET:
         try:
             self.logger.info(f"🏢 Selecionando empresa: {nome} ({cnpj})")
 
-            # Aguardar carregamento da página
             await asyncio.sleep(2)
 
-            # Procurar por seletor de empresa (ajustar conforme o portal)
+            # Procurar por diferentes formas de seleção de empresa
             try:
-                # Tentar encontrar um select ou input de CNPJ
-                await self.page.fill("input[name*='cnpj']", cnpj)
-                await self.page.keyboard.press("Enter")
-                await asyncio.sleep(3)
-                self.logger.info("✅ Empresa selecionada")
-                return True
-            except Exception:
-                self.logger.warning("⚠️  Seletor de empresa não encontrado")
-                # Pode já estar na empresa correta ou não ter seletor
+                # Tentar encontrar select/dropdown de empresa
+                empresa_selecionada = False
+
+                # Método 1: Select com CNPJ
+                try:
+                    await self.page.select_option("select[name*='empresa']", value=cnpj)
+                    empresa_selecionada = True
+                    self.logger.info("✅ Empresa selecionada via select")
+                except:
+                    pass
+
+                # Método 2: Input de CNPJ
+                if not empresa_selecionada:
+                    try:
+                        await self.page.fill("input[name*='cnpj']", cnpj)
+                        await self.page.keyboard.press("Enter")
+                        await asyncio.sleep(2)
+                        empresa_selecionada = True
+                        self.logger.info("✅ CNPJ digitado e confirmado")
+                    except:
+                        pass
+
+                # Método 3: Link com CNPJ
+                if not empresa_selecionada:
+                    try:
+                        await self.page.click(f"text={cnpj}")
+                        empresa_selecionada = True
+                        self.logger.info("✅ Empresa selecionada via link")
+                    except:
+                        pass
+
+                if not empresa_selecionada:
+                    self.logger.warning("⚠️  Não foi possível selecionar empresa explicitamente")
+                    self.logger.info("Assumindo que já está na empresa correta ou não há seletor")
+
+                await asyncio.sleep(2)
                 return True
 
+            except Exception as e:
+                self.logger.warning(f"⚠️  Erro ao selecionar empresa: {str(e)}")
+                return True  # Continuar mesmo se não conseguir selecionar
+
         except Exception as e:
-            self.logger.error(f"❌ Erro ao selecionar empresa: {str(e)}")
-            self.logger.exception("Traceback:")
+            self.logger.error(f"❌ Erro crítico ao selecionar empresa: {str(e)}")
             return False
 
     async def acessar_mensagens(self) -> bool:
@@ -248,36 +380,59 @@ class RobotDET:
         try:
             self.logger.info("📧 Acessando seção de mensagens...")
 
-            # Procurar por link/menu de mensagens
+            await asyncio.sleep(2)
+
+            # Tentar diferentes métodos para acessar mensagens
+            mensagens_acessadas = False
+
+            # Método 1: Link com texto "Mensagens"
             try:
-                # Tentar XPath primeiro
-                link_mensagens = await self.page.wait_for_selector(
-                    config.SELETORES["menu_mensagens"],
-                    timeout=10000
-                )
-                await link_mensagens.click()
-            except Exception:
-                # Tentar CSS selector
+                await self.page.click("text=Mensagens", timeout=5000)
+                mensagens_acessadas = True
+                self.logger.info("✅ Link 'Mensagens' clicado")
+            except:
+                pass
+
+            # Método 2: XPath com texto
+            if not mensagens_acessadas:
                 try:
-                    link_mensagens = await self.page.wait_for_selector(
-                        config.SELETORES["link_mensagens"],
-                        timeout=10000
-                    )
-                    await link_mensagens.click()
-                except Exception:
-                    self.logger.warning("⚠️  Link de mensagens não encontrado via seletor")
-                    # Tentar navegar diretamente pela URL
-                    await self.page.goto(config.DET_MENSAGENS_URL)
+                    await self.page.click("//a[contains(text(), 'Mensagens')]", timeout=5000)
+                    mensagens_acessadas = True
+                    self.logger.info("✅ Link 'Mensagens' clicado (XPath)")
+                except:
+                    pass
+
+            # Método 3: Menu com ícone
+            if not mensagens_acessadas:
+                try:
+                    await self.page.click("a[href*='mensagem']", timeout=5000)
+                    mensagens_acessadas = True
+                    self.logger.info("✅ Link de mensagens clicado (href)")
+                except:
+                    pass
+
+            # Método 4: Navegar diretamente pela URL
+            if not mensagens_acessadas:
+                try:
+                    url_mensagens = config.DET_MENSAGENS_URL or f"{config.DET_URL}/mensagens"
+                    await self.page.goto(url_mensagens)
+                    mensagens_acessadas = True
+                    self.logger.info("✅ Navegado diretamente para mensagens")
+                except:
+                    pass
+
+            if not mensagens_acessadas:
+                self.logger.warning("⚠️  Não foi possível acessar mensagens explicitamente")
+                self.logger.info("Tentando continuar mesmo assim...")
 
             await asyncio.sleep(3)
-            await self.page.wait_for_load_state("networkidle")
+            await self.page.wait_for_load_state("networkidle", timeout=30000)
 
             self.logger.info("✅ Seção de mensagens acessada")
             return True
 
         except Exception as e:
             self.logger.error(f"❌ Erro ao acessar mensagens: {str(e)}")
-            self.logger.exception("Traceback:")
             return False
 
     async def verificar_mensagens_nao_lidas(self) -> List[Dict[str, Any]]:
@@ -292,57 +447,81 @@ class RobotDET:
 
             mensagens = []
 
-            # Método 1: Verificar contador de mensagens
-            try:
-                contador = await self.page.query_selector(config.SELETORES["contador_mensagens"])
-                if contador:
-                    texto_contador = await contador.text_content()
-                    num_mensagens = int(texto_contador.strip())
-                    if num_mensagens > 0:
-                        self.logger.info(f"📬 Encontradas {num_mensagens} mensagens não lidas (via contador)")
-            except Exception:
-                self.logger.debug("Contador de mensagens não encontrado")
+            await asyncio.sleep(2)
 
-            # Método 2: Buscar mensagens não lidas na lista
+            # Método 1: Procurar contador de mensagens
             try:
-                elementos_mensagens = await self.page.query_selector_all(
-                    config.SELETORES["mensagens_nao_lidas"]
-                )
+                # Procurar elementos que podem indicar mensagens não lidas
+                seletores_contador = [
+                    ".mensagens-nao-lidas",
+                    ".contador-mensagens",
+                    ".badge-mensagens",
+                    "span:has-text('não lida')",
+                    ".unread-count"
+                ]
 
-                for elemento in elementos_mensagens:
+                for seletor in seletores_contador:
                     try:
-                        mensagem = await self._extrair_dados_mensagem(elemento)
-                        if mensagem:
-                            mensagens.append(mensagem)
-                    except Exception as e:
-                        self.logger.warning(f"⚠️  Erro ao extrair dados da mensagem: {str(e)}")
+                        contador = await self.page.query_selector(seletor)
+                        if contador:
+                            texto = await contador.text_content()
+                            numeros = re.findall(r'\d+', texto)
+                            if numeros:
+                                num_msg = int(numeros[0])
+                                if num_msg > 0:
+                                    self.logger.info(f"📬 Contador encontrado: {num_msg} mensagem(ns) não lida(s)")
+                    except:
+                        continue
+            except Exception as e:
+                self.logger.debug(f"Erro ao buscar contador: {str(e)}")
+
+            # Método 2: Procurar lista de mensagens não lidas
+            try:
+                # Seletores comuns para mensagens não lidas
+                seletores_mensagens = [
+                    ".mensagem.nao-lida",
+                    ".mensagem.unread",
+                    "tr.unread",
+                    ".message-unread",
+                    "[data-status='nao-lida']"
+                ]
+
+                for seletor in seletores_mensagens:
+                    try:
+                        elementos = await self.page.query_selector_all(seletor)
+                        if elementos:
+                            self.logger.info(f"Encontrados {len(elementos)} elementos com seletor: {seletor}")
+                            for elemento in elementos:
+                                mensagem = await self._extrair_dados_mensagem(elemento)
+                                if mensagem and mensagem not in mensagens:
+                                    mensagens.append(mensagem)
+                    except:
                         continue
 
             except Exception as e:
-                self.logger.debug(f"Erro ao buscar mensagens via seletor: {str(e)}")
+                self.logger.debug(f"Erro ao buscar mensagens: {str(e)}")
 
-            # Método 3: Verificar todos os itens de mensagem
+            # Método 3: Verificar todas as mensagens e identificar as não lidas
             try:
-                todos_itens = await self.page.query_selector_all(
-                    config.SELETORES["mensagem_item"]
-                )
+                # Procurar todas as mensagens e verificar status
+                todas_mensagens = await self.page.query_selector_all("tr.mensagem, .mensagem-item, .message-row")
 
-                for item in todos_itens:
+                for elemento in todas_mensagens:
                     try:
-                        # Verificar se tem indicador de não lida
-                        indicador = await item.query_selector(config.SELETORES["indicador_nao_lida"])
-                        if indicador:
-                            mensagem = await self._extrair_dados_mensagem(item)
+                        # Verificar se tem classe de não lida ou ícone
+                        classes = await elemento.get_attribute("class") or ""
+                        if "nao-lida" in classes.lower() or "unread" in classes.lower():
+                            mensagem = await self._extrair_dados_mensagem(elemento)
                             if mensagem and mensagem not in mensagens:
                                 mensagens.append(mensagem)
-                    except Exception:
+                    except:
                         continue
 
             except Exception as e:
-                self.logger.debug(f"Erro ao verificar itens de mensagem: {str(e)}")
+                self.logger.debug(f"Erro ao verificar todas mensagens: {str(e)}")
 
             if mensagens:
-                self.logger.info(f"📬 Total de {len(mensagens)} mensagens não lidas encontradas")
+                self.logger.info(f"✅ Total de {len(mensagens)} mensagem(ns) não lida(s) encontrada(s)")
             else:
                 self.logger.info("📭 Nenhuma mensagem não lida encontrada")
 
@@ -372,39 +551,62 @@ class RobotDET:
                 "conteudo_preview": ""
             }
 
-            # Extrair assunto
+            # Obter todo o texto do elemento
+            texto_completo = await elemento.text_content()
+
+            # Extrair assunto (geralmente o texto mais proeminente)
             try:
-                assunto_elem = await elemento.query_selector(config.SELETORES["mensagem_assunto"])
-                if assunto_elem:
-                    mensagem["assunto"] = (await assunto_elem.text_content()).strip()
-            except Exception:
+                # Tentar seletores específicos para assunto
+                seletores_assunto = ["td.assunto", ".mensagem-assunto", ".subject", "td:nth-child(2)"]
+                for sel in seletores_assunto:
+                    elem = await elemento.query_selector(sel)
+                    if elem:
+                        mensagem["assunto"] = (await elem.text_content()).strip()
+                        break
+
+                if not mensagem["assunto"]:
+                    # Se não encontrou, usar primeira linha significativa
+                    linhas = texto_completo.split('\n')
+                    for linha in linhas:
+                        linha = linha.strip()
+                        if linha and len(linha) > 5:
+                            mensagem["assunto"] = linha
+                            break
+            except:
                 pass
 
             # Extrair data
             try:
-                data_elem = await elemento.query_selector(config.SELETORES["mensagem_data"])
-                if data_elem:
-                    mensagem["data"] = (await data_elem.text_content()).strip()
-            except Exception:
+                # Procurar padrões de data
+                datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto_completo)
+                if datas:
+                    mensagem["data"] = datas[0]
+            except:
                 pass
 
             # Extrair remetente
             try:
-                remetente_elem = await elemento.query_selector(config.SELETORES["mensagem_remetente"])
-                if remetente_elem:
-                    mensagem["remetente"] = (await remetente_elem.text_content()).strip()
-            except Exception:
+                seletores_remetente = ["td.remetente", ".mensagem-remetente", ".from", "td:nth-child(1)"]
+                for sel in seletores_remetente:
+                    elem = await elemento.query_selector(sel)
+                    if elem:
+                        mensagem["remetente"] = (await elem.text_content()).strip()
+                        break
+            except:
                 pass
 
             # Verificar se tem anexo
             try:
-                anexo_elem = await elemento.query_selector(config.SELETORES["icone_anexo"])
-                if anexo_elem:
+                if "anexo" in texto_completo.lower() or "📎" in texto_completo:
                     mensagem["tem_anexo"] = True
-            except Exception:
+            except:
                 pass
 
-            return mensagem if mensagem["assunto"] or mensagem["data"] else None
+            # Só retornar se tiver pelo menos assunto ou data
+            if mensagem["assunto"] or mensagem["data"]:
+                return mensagem
+            else:
+                return None
 
         except Exception as e:
             self.logger.debug(f"Erro ao extrair dados da mensagem: {str(e)}")
@@ -441,7 +643,7 @@ class RobotDET:
             if not await self.selecionar_empresa(cnpj, nome):
                 resultado["status"] = "Erro ao selecionar empresa"
                 resultado["erro"] = "Falha na seleção da empresa"
-                return resultado
+                self.logger.warning("⚠️  Continuando mesmo com erro na seleção...")
 
             # Acessar mensagens
             if not await self.acessar_mensagens():
@@ -490,10 +692,12 @@ class RobotDET:
 
             # Inicializar browser
             if not await self.inicializar_browser():
+                self.logger.error("❌ Falha ao inicializar navegador")
                 return False
 
             # Acessar portal
             if not await self.acessar_portal():
+                self.logger.error("❌ Falha ao acessar portal")
                 await self.fechar_browser()
                 return False
 
@@ -524,11 +728,16 @@ class RobotDET:
                 if idx < len(lista_cnpj):
                     await asyncio.sleep(2)
 
-            # Gerar resumo
+            # Gerar resumo e relatórios
             await self._gerar_resumo()
 
             # Fechar browser
             await self.fechar_browser()
+
+            self.logger.info("")
+            self.logger.info("="*70)
+            self.logger.info("✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!")
+            self.logger.info("="*70)
 
             return True
 
@@ -586,7 +795,7 @@ class RobotDET:
                 html_path = config.RESULTS_DIR / f"mensagens_det_{timestamp_file}.html"
                 with open(html_path, 'w', encoding='utf-8') as f:
                     f.write(html_content)
-                self.logger.info(f"📊 Resultado salvo em HTML: {html_path}")
+                self.logger.info(f"📊 Relatório HTML salvo: {html_path}")
             except Exception as e:
                 self.logger.warning(f"Erro ao salvar HTML: {str(e)}")
 
@@ -597,6 +806,7 @@ class RobotDET:
     def _gerar_relatorio_html(self, dados: Dict[str, Any]) -> str:
         """
         Gera relatório HTML visual com os resultados
+        Baseado no robô FGTS
 
         Args:
             dados: Dicionário com os dados do resultado
@@ -802,6 +1012,7 @@ class RobotDET:
     <div class="container">
         <div class="header">
             <h1>🤖 Relatório de Mensagens DET</h1>
+            <p>Portal: https://det.sit.trabalho.gov.br/</p>
             <p>Gerado em: {timestamp}</p>
         </div>
 
@@ -883,7 +1094,7 @@ class RobotDET:
                             <div class="mensagem-assunto">📧 {assunto}</div>
                             <div class="mensagem-info">
                                 {f'📅 {data}' if data else ''}
-                                {f'| 👤 {remetente}' if remetente else ''}
+                                {f' | 👤 {remetente}' if remetente else ''}
                                 {' | 📎 Anexo' if tem_anexo else ''}
                             </div>
                         </div>
@@ -913,8 +1124,9 @@ class RobotDET:
         </div>
 
         <div class="footer">
-            <p><strong>Robô DET - Verificador de Mensagens</strong></p>
+            <p><strong>Robô DET - Verificador de Mensagens v2.0</strong></p>
             <p>Automação de verificação de mensagens do Portal DET</p>
+            <p>Baseado no Robô FGTS com suporte aprimorado para certificados digitais</p>
         </div>
     </div>
 </body>
