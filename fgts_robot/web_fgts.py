@@ -424,10 +424,22 @@ def main():
 
             st.divider()
 
-            # Lista de CNPJs processados
+            # Lista de empresas processadas
             st.subheader("🏢 Empresas Processadas")
-            for cnpj in dados['cnpjs_processados']:
-                st.code(formatar_cnpj(cnpj))
+
+            # Verificar se há informação de empresas com nome
+            if 'empresas' in dados and dados['empresas']:
+                for emp in dados['empresas']:
+                    with st.container():
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.markdown(f"**{emp['nome']}**")
+                        with col2:
+                            st.code(formatar_cnpj(emp['cnpj']))
+            else:
+                # Fallback: mostrar só CNPJs se não houver info de empresas
+                for cnpj in dados['cnpjs_processados']:
+                    st.code(formatar_cnpj(cnpj))
 
             st.divider()
 

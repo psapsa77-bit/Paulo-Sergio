@@ -56,6 +56,7 @@ class RoboFGTS:
         # Resultados do processamento
         self.competencias_encontradas: List[str] = []
         self.cnpjs_processados: List[str] = []
+        self.nomes_empresas: Dict[str, str] = {}  # Mapeia CNPJ -> Nome da empresa
         self.dados_resultado: Optional[Dict[str, Any]] = None
 
         self.logger.info("Robô FGTS inicializado")
@@ -1499,6 +1500,103 @@ class RoboFGTS:
             self.logger.exception("Traceback:")
             await self._screenshot_erro("erro_trocar_perfil")
             return False
+
+    async def _capturar_nome_empresa(self, cnpj: str) -> str:
+        """
+        Captura o nome da empresa da interface após troca de perfil
+
+        Args:
+            cnpj: CNPJ da empresa
+
+        Returns:
+            str: Nome da empresa ou o próprio CNPJ se não encontrar
+        """
+        try:
+            self.logger.info("🔍 Tentando capturar nome da empresa...")
+
+            # Aguardar um pouco para a página carregar completamente
+            await asyncio.sleep(2)
+
+            # Tentar capturar o nome da empresa de vários lugares possíveis
+            nome_empresa = await self.page.evaluate("""
+                () => {
+                    // Procurar em elementos comuns que mostram o nome da empresa
+                    const possiveisSeletores = [
+                        // Cabeçalho/Header
+                        'header', '.header', '#header',
+                        // Sidebar/Menu
+                        '.sidebar', '#sidebar', 'aside',
+                        // Informações de perfil
+                        '.perfil', '.profile', '#perfil',
+                        // Área de usuário
+                        '.user-info', '.usuario', '#user',
+                        // Breadcrumb
+                        '.breadcrumb', '#breadcrumb',
+                        // Título da página
+                        '.page-title', '.titulo', 'h1', 'h2',
+                        // Qualquer elemento com classe que contenha "empresa" ou "razao"
+                        '[class*="empresa"]', '[class*="razao"]',
+                        // Body inteiro como fallback
+                        'body'
+                    ];
+
+                    for (const seletor of possiveisSeletores) {
+                        const elementos = document.querySelectorAll(seletor);
+                        for (const elemento of elementos) {
+                            const texto = elemento.innerText || '';
+
+                            // Procurar por padrões de razão social
+                            // Geralmente está em uma linha com o CNPJ ou próxima a ele
+                            const linhas = texto.split('\\n');
+
+                            for (let i = 0; i < linhas.length; i++) {
+                                const linha = linhas[i].trim();
+
+                                // Se a linha tem pelo menos 10 caracteres e não é um menu/link comum
+                                if (linha.length >= 10 &&
+                                    !linha.toLowerCase().includes('menu') &&
+                                    !linha.toLowerCase().includes('sair') &&
+                                    !linha.toLowerCase().includes('início') &&
+                                    !linha.toLowerCase().includes('voltar') &&
+                                    !linha.match(/^\\d+$/) && // Não é só números
+                                    linha.match(/[A-Za-z].*[A-Za-z]/)) { // Tem pelo menos 2 letras
+
+                                    // Verificar se contém palavras típicas de razão social
+                                    if (linha.match(/LTDA|S\\.?A\\.?|ME|EPP|EIRELI|CIA|COMÉRCIO|INDÚSTRIA|SERVIÇOS|EMPRESA/i)) {
+                                        return linha.substring(0, 100); // Limitar a 100 caracteres
+                                    }
+
+                                    // Se estiver próximo ao CNPJ na mesma linha ou linha anterior/posterior
+                                    const linhaAnterior = i > 0 ? linhas[i-1] : '';
+                                    const linhaPosterior = i < linhas.length-1 ? linhas[i+1] : '';
+
+                                    if (linha.includes('CNPJ') || linhaAnterior.includes('CNPJ') || linhaPosterior.includes('CNPJ')) {
+                                        // Pegar linha que não contém "CNPJ"
+                                        if (!linha.includes('CNPJ') && linha.length > 10) {
+                                            return linha.substring(0, 100);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return null;
+                }
+            """)
+
+            if nome_empresa and nome_empresa.strip():
+                nome_empresa = nome_empresa.strip()
+                self.logger.info(f"✅ Nome da empresa capturado: {nome_empresa}")
+                return nome_empresa
+            else:
+                self.logger.warning(f"⚠️  Não foi possível capturar o nome da empresa. Usando CNPJ: {cnpj}")
+                return cnpj
+
+        except Exception as e:
+            self.logger.warning(f"⚠️  Erro ao capturar nome da empresa: {str(e)}")
+            self.logger.warning(f"Usando CNPJ como nome: {cnpj}")
+            return cnpj
 
     async def _buscar_competencias_em_aberto(self) -> List[str]:
         """
@@ -3048,7 +3146,14 @@ class RoboFGTS:
             for cnpj in lista_cnpj:
                 try:
                     self.logger.info("")
-                    await self._trocar_perfil_procurador(cnpj)
+                    sucesso_troca = await self._trocar_perfil_procurador(cnpj)
+
+                    if sucesso_troca:
+                        # Capturar nome da empresa após troca de perfil
+                        nome_empresa = await self._capturar_nome_empresa(cnpj)
+                        self.nomes_empresas[cnpj] = nome_empresa
+                        self.logger.info(f"📋 Empresa: {nome_empresa}")
+
                     break  # Só precisa trocar uma vez para a primeira empresa
                 except Exception as e:
                     self.logger.warning(f"Erro ao trocar perfil para {cnpj}: {str(e)}")
@@ -3087,17 +3192,31 @@ class RoboFGTS:
                 self.competencias_encontradas = competencias_encontradas
                 self.cnpjs_processados = lista_cnpj
 
+                # Preparar lista de empresas com CNPJ e nome
+                empresas_info = []
+                for cnpj in lista_cnpj:
+                    nome = self.nomes_empresas.get(cnpj, cnpj)
+                    empresas_info.append({
+                        "cnpj": cnpj,
+                        "nome": nome
+                    })
+
                 # Preparar dados para exportação
                 dados_resultado = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "cnpjs_processados": lista_cnpj,
+                    "empresas": empresas_info,
                     "total_competencias": len(competencias_encontradas),
                     "competencias_em_aberto": competencias_encontradas
                 }
                 self.dados_resultado = dados_resultado
 
                 # Mostrar resultado no log
-                self.logger.info(f"🏢 CNPJs Processados: {', '.join(lista_cnpj)}")
+                self.logger.info(f"🏢 Empresas Processadas:")
+                for emp in empresas_info:
+                    self.logger.info(f"   • {emp['nome']}")
+                    self.logger.info(f"     CNPJ: {emp['cnpj']}")
+                self.logger.info("")
                 self.logger.info(f"📋 Total de Competências em Aberto: {len(competencias_encontradas)}")
                 self.logger.info("")
                 self.logger.info("📅 Competências Encontradas:")
@@ -3119,9 +3238,14 @@ class RoboFGTS:
                 try:
                     import pandas as pd
 
+                    # Pegar informações da primeira empresa (principal)
+                    cnpj_principal = lista_cnpj[0]
+                    nome_principal = self.nomes_empresas.get(cnpj_principal, cnpj_principal)
+
                     # Criar DataFrame com as competências
                     df = pd.DataFrame({
-                        'CNPJ': [lista_cnpj[0]] * len(competencias_encontradas),
+                        'Empresa': [nome_principal] * len(competencias_encontradas),
+                        'CNPJ': [cnpj_principal] * len(competencias_encontradas),
                         'Competência': competencias_encontradas,
                         'Status': ['Em Aberto'] * len(competencias_encontradas)
                     })
