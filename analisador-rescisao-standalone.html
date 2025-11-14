@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Rescisões Trabalhistas</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React e ReactDOM via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel Standalone para compilar JSX no navegador -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Componentes de ícones SVG
+        const FileText = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        );
+
+        const Upload = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+        );
+
+        const Download = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        );
+
+        const CheckCircle = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        const Clock = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        const Trash2 = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+        );
+
+        const Plus = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+        );
+
+        // Funções auxiliares
+        const formatCurrency = (value) => {
+            return value.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+            });
+        };
+
+        const formatDate = (dateString) => {
+            let dateToFormat;
+            if (dateString.includes('T')) {
+                dateToFormat = new Date(dateString);
+            } else {
+                dateToFormat = new Date(dateString + 'T12:00:00');
+            }
+            return dateToFormat.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+            });
+        };
+
+        // Dados de exemplo
+        const EXEMPLO_WANESSA = {
+            employeeName: 'WANESSA NASCIMENTO SOUSA',
+            employerName: 'OCL CONVENIENCIAS LTDA',
+            rescissionDate: '2025-07-30',
+            rescissionType: 'Extinção normal do contrato de trabalho por prazo determinado',
+            items: [
+                {
+                    codigo: '63',
+                    descricao: '13º Salário Proporcional 01/12 avos',
+                    valor: 277.83,
+                    tipo: 'credito',
+                    explicacao: 'Décimo terceiro salário proporcional referente a 1/12 avos do período trabalhado'
+                },
+                {
+                    codigo: '65',
+                    descricao: 'Férias Proporcionais 02/12 avos',
+                    valor: 277.83,
+                    tipo: 'credito',
+                    explicacao: 'Férias proporcionais referentes a 2/12 avos do período trabalhado'
+                },
+                {
+                    codigo: '68',
+                    descricao: 'Terço Constitucional de Férias',
+                    valor: 92.61,
+                    tipo: 'credito',
+                    explicacao: 'Um terço constitucional sobre as férias proporcionais'
+                },
+                {
+                    codigo: '95',
+                    descricao: 'Outras Verbas (FGTS)',
+                    valor: 288.94,
+                    tipo: 'credito',
+                    explicacao: 'Valor referente ao FGTS depositado durante o período trabalhado'
+                }
+            ],
+            totalCreditos: 937.22,
+            totalDebitos: 0.00,
+            valorLiquido: 937.22,
+            fgts: {},
+            observacoes: [
+                'Esta rescisão refere-se à extinção normal do contrato de trabalho por prazo determinado. A trabalhadora foi admitida em 01/06/2025 e o término do contrato ocorreu em 31/07/2025, totalizando aproximadamente 2 meses de vínculo empregatício.',
+                'Não houve pagamento de aviso prévio indenizado, o que é normal nesta modalidade de rescisão, pois o contrato por prazo determinado chegou ao seu fim natural sem necessidade de aviso prévio.',
+                'Foram pagos o 13º salário proporcional no valor de R$ 277,83 referente a 1/12 avos, férias proporcionais de R$ 277,83 correspondentes a 2/12 avos do período trabalhado, e o terço constitucional de férias no valor de R$ 92,61.',
+                'O prazo legal para pagamento das verbas rescisórias é de até 10 dias corridos após o término do contrato. Esta rescisão será homologada e os valores estarão disponíveis dentro deste prazo.',
+                'Por se tratar de extinção natural de contrato por prazo determinado, não há direito ao saque do FGTS por rescisão sem justa causa nem ao seguro-desemprego. O valor de R$ 288,94 refere-se aos depósitos do FGTS realizados durante o período trabalhado.',
+                'A empresa agradece pelos serviços prestados durante este período. Em caso de dúvidas sobre os valores ou prazos, nossa equipe de RH está à disposição para esclarecimentos.'
+            ]
+        };
+
+        // Componente Principal
+        function RescissionAnalyzer() {
+            const [analyses, setAnalyses] = useState([]);
+            const [currentView, setCurrentView] = useState('list');
+            const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [termoFile, setTermoFile] = useState(null);
+            const [manualFgts, setManualFgts] = useState({
+                saldoFgts: '',
+                multaFgts: '',
+                totalFgts: ''
+            });
+            const [showPrintModal, setShowPrintModal] = useState(false);
+            const [printHtml, setPrintHtml] = useState('');
+
+            const handleFileChange = (file) => {
+                setTermoFile(file);
+            };
+
+            const fileToBase64 = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64 = reader.result;
+                        const base64Data = base64.split(',')[1];
+                        resolve(base64Data);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const analyzeDocumentWithClaude = async (termoFile, manualFgts) => {
+                const termoBase64 = await fileToBase64(termoFile);
+
+                const promptText = `Você é um especialista em legislação trabalhista brasileira. Analise o Termo de Rescisão do Contrato de Trabalho (TRCT) fornecido e extraia TODAS as informações detalhadas.
+
+Retorne APENAS um objeto JSON válido (sem markdown, sem texto adicional) com esta estrutura EXATA:
+{
+  "employeeName": "Nome completo do funcionário",
+  "employerName": "Razão social da empresa",
+  "rescissionDate": "2024-10-23",
+  "rescissionType": "Tipo de rescisão",
+  "items": [
+    {
+      "codigo": "50",
+      "descricao": "Descrição da verba",
+      "valor": 1000.50,
+      "tipo": "credito",
+      "explicacao": "Explicação clara"
+    }
+  ],
+  "totalCreditos": 10000.00,
+  "totalDebitos": 500.00,
+  "valorLiquido": 9500.00,
+  "fgts": {},
+  "observacoes": ["Parágrafo 1 explicativo", "Parágrafo 2 explicativo"]
+}
+
+IMPORTANTE:
+- Extraia TODAS as verbas e descontos do documento
+- Retorne APENAS o JSON puro, SEM markdown (sem \`\`\`json)
+- Use números decimais para valores monetários
+- Nas observações, forneça parágrafos detalhados sobre o contexto da rescisão`;
+
+                const messages = [
+                    {
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: promptText
+                            },
+                            {
+                                type: "document",
+                                source: {
+                                    type: "base64",
+                                    media_type: "application/pdf",
+                                    data: termoBase64
+                                }
+                            }
+                        ]
+                    }
+                ];
+
+                console.log('Iniciando análise com Claude API...');
+
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        // ADICIONE SUA API KEY AQUI:
+                        // "x-api-key": "sua_api_key_aqui",
+                        // "anthropic-version": "2023-06-01"
+                    },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 8000,
+                        messages
+                    })
+                });
+
+                console.log('Status da resposta:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Erro na API:', errorText);
+                    throw new Error(`Erro na API: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Resposta da API:', data);
+
+                const content = data.content.find((c) => c.type === "text")?.text;
+
+                if (!content) {
+                    throw new Error("Resposta vazia da API");
+                }
+
+                console.log('Conteúdo extraído:', content);
+
+                const cleanContent = content
+                    .replace(/```json\n?/g, '')
+                    .replace(/```\n?/g, '')
+                    .trim();
+
+                const parsed = JSON.parse(cleanContent);
+                console.log('JSON parseado:', parsed);
+
+                const fgtsData = {};
+                if (manualFgts.saldoFgts) fgtsData.saldoFgts = parseFloat(manualFgts.saldoFgts);
+                if (manualFgts.multaFgts) fgtsData.multaFgts = parseFloat(manualFgts.multaFgts);
+                if (manualFgts.totalFgts) fgtsData.totalFgts = parseFloat(manualFgts.totalFgts);
+
+                return {
+                    employeeName: parsed.employeeName || 'Funcionário',
+                    employerName: parsed.employerName || 'Empresa',
+                    rescissionDate: parsed.rescissionDate || new Date().toISOString().split('T')[0],
+                    rescissionType: parsed.rescissionType || 'Não especificado',
+                    items: parsed.items || [],
+                    totalCreditos: parsed.totalCreditos || 0,
+                    totalDebitos: parsed.totalDebitos || 0,
+                    valorLiquido: parsed.valorLiquido || 0,
+                    fgts: Object.keys(fgtsData).length > 0 ? fgtsData : (parsed.fgts || {}),
+                    observacoes: parsed.observacoes || []
+                };
+            };
+
+            const processAnalysis = async () => {
+                if (!termoFile) {
+                    alert('Por favor, faça upload do Termo de Rescisão');
+                    return;
+                }
+
+                setIsProcessing(true);
+
+                try {
+                    console.log('Iniciando processamento...');
+
+                    let analysisData;
+
+                    try {
+                        console.log('Tentando processar com Claude API...');
+                        analysisData = await Promise.race([
+                            analyzeDocumentWithClaude(termoFile, manualFgts),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Timeout: API demorou mais de 60 segundos')), 60000)
+                            )
+                        ]);
+                        console.log('Dados recebidos da API:', analysisData);
+                    } catch (apiError) {
+                        console.error('Erro na API, usando dados de exemplo:', apiError);
+                        analysisData = EXEMPLO_WANESSA;
+                        alert('⚠️ A API Claude está temporariamente indisponível ou ocorreu um erro.\n\nExibindo dados de exemplo (Wanessa Nascimento Sousa) para demonstração.\n\nVerifique o console (F12) para detalhes do erro.');
+                    }
+
+                    const completedAnalysis = {
+                        id: `analysis-${Date.now()}`,
+                        ...analysisData,
+                        status: 'completed',
+                        createdAt: new Date().toISOString(),
+                    };
+
+                    console.log('Análise completa:', completedAnalysis);
+
+                    setAnalyses(prev => [completedAnalysis, ...prev]);
+                    setSelectedAnalysis(completedAnalysis);
+                    setCurrentView('detail');
+                    setTermoFile(null);
+                    setManualFgts({ saldoFgts: '', multaFgts: '', totalFgts: '' });
+
+                    console.log('Processamento concluído com sucesso!');
+                } catch (error) {
+                    console.error('ERRO no processamento:', error);
+                    alert('❌ Erro ao processar análise:\n\n' + (error instanceof Error ? error.message : 'Erro desconhecido'));
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            const deleteAnalysis = (id) => {
+                if (confirm('Tem certeza que deseja excluir esta análise?')) {
+                    setAnalyses(prev => prev.filter(a => a.id !== id));
+                    if (selectedAnalysis?.id === id) {
+                        setCurrentView('list');
+                        setSelectedAnalysis(null);
+                    }
+                }
+            };
+
+            const generatePrintHtml = () => {
+                if (!selectedAnalysis) return '';
+
+                const creditos = selectedAnalysis.items.filter(item => item.tipo === 'credito');
+                const debitos = selectedAnalysis.items.filter(item => item.tipo === 'debito');
+
+                return `<!DOCTYPE html>
+<html>
+<head>
+<title>Rescisão - ${selectedAnalysis.employeeName}</title>
+<meta charset="UTF-8">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; color: #333; }
+h1 { color: #2563eb; margin-bottom: 5px; }
+h2 { color: #1f2937; margin-top: 30px; }
+h3 { color: #059669; }
+.header { border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 20px; }
+.empresa { color: #666; font-size: 18px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+.info-item label { color: #666; font-size: 14px; display: block; }
+.info-item value { font-size: 18px; font-weight: 600; }
+.resumo { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; }
+.resumo-item { padding: 15px; border-radius: 8px; }
+.credito { background: #dcfce7; border-left: 4px solid #22c55e; }
+.debito { background: #fee2e2; border-left: 4px solid #ef4444; }
+.liquido { background: #dbeafe; border-left: 4px solid #3b82f6; }
+.valor { font-size: 24px; font-weight: bold; margin: 10px 0; }
+.valor.verde { color: #16a34a; }
+.valor.vermelho { color: #dc2626; }
+.valor.azul { color: #2563eb; }
+.item { border-left: 4px solid #22c55e; padding-left: 15px; margin: 15px 0; page-break-inside: avoid; }
+.item.debito { border-left-color: #ef4444; }
+.codigo { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; }
+.codigo.debito { background: #fee2e2; color: #991b1b; }
+.item-valor { float: right; font-size: 18px; font-weight: bold; }
+.item-valor.verde { color: #16a34a; }
+.item-valor.vermelho { color: #dc2626; }
+.descricao { font-weight: 600; margin: 8px 0 5px 0; clear: both; }
+.explicacao { color: #666; font-size: 14px; }
+.observacoes { background: #f9fafb; padding: 20px; border-radius: 8px; margin-top: 30px; }
+.observacoes p { margin: 10px 0; line-height: 1.6; }
+.footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
+@media print { body { margin: 20px; } .resumo { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="header">
+<h1>${selectedAnalysis.employeeName}</h1>
+<div class="empresa">${selectedAnalysis.employerName}</div>
+</div>
+<div class="info-grid">
+<div class="info-item">
+<label>Data da Rescisão</label>
+<value>${formatDate(selectedAnalysis.rescissionDate)}</value>
+</div>
+<div class="info-item">
+<label>Tipo de Rescisão</label>
+<value>${selectedAnalysis.rescissionType}</value>
+</div>
+</div>
+<h2>Resumo Financeiro</h2>
+<div class="resumo">
+<div class="resumo-item credito">
+<div>Total de Créditos</div>
+<div class="valor verde">${formatCurrency(selectedAnalysis.totalCreditos)}</div>
+<div style="font-size: 12px; color: #666;">Valores a receber</div>
+</div>
+<div class="resumo-item debito">
+<div>Total de Débitos</div>
+<div class="valor vermelho">${formatCurrency(selectedAnalysis.totalDebitos)}</div>
+<div style="font-size: 12px; color: #666;">Descontos aplicados</div>
+</div>
+<div class="resumo-item liquido">
+<div>Valor Líquido</div>
+<div class="valor azul">${formatCurrency(selectedAnalysis.valorLiquido)}</div>
+<div style="font-size: 12px; color: #666;">Valor final a receber</div>
+</div>
+</div>
+<h3>💰 Valores a Receber</h3>
+${creditos.map(item => `<div class="item">
+<span class="item-valor verde">${formatCurrency(item.valor)}</span>
+<span class="codigo">${item.codigo}</span>
+<div class="descricao">${item.descricao}</div>
+<div class="explicacao">${item.explicacao}</div>
+</div>`).join('\n')}
+${debitos.length > 0 ? `<h3 style="color: #dc2626;">📉 Descontos Aplicados</h3>
+${debitos.map(item => `<div class="item debito">
+<span class="item-valor vermelho">${formatCurrency(item.valor)}</span>
+<span class="codigo debito">${item.codigo}</span>
+<div class="descricao">${item.descricao}</div>
+<div class="explicacao">${item.explicacao}</div>
+</div>`).join('\n')}` : ''}
+${selectedAnalysis.observacoes.length > 0 ? `<div class="observacoes">
+<h3>📋 Informações sobre a Rescisão</h3>
+${selectedAnalysis.observacoes.map(obs => `<p>${obs}</p>`).join('\n')}
+</div>` : ''}
+<div class="footer">
+Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+</div>
+</body>
+</html>`;
+            };
+
+            const handlePrint = () => {
+                const html = generatePrintHtml();
+                setPrintHtml(html);
+                setShowPrintModal(true);
+            };
+
+            const copyToClipboard = async () => {
+                try {
+                    await navigator.clipboard.writeText(printHtml);
+                    alert('✅ HTML copiado!\n\n1. Abra um editor de texto (Notepad, VS Code, etc.)\n2. Cole o conteúdo (Ctrl+V)\n3. Salve como "rescisao.html"\n4. Abra no navegador e use Ctrl+P para gerar PDF');
+                } catch (err) {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = printHtml;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        alert('✅ HTML copiado!\n\n1. Abra um editor de texto (Notepad, VS Code, etc.)\n2. Cole o conteúdo (Ctrl+V)\n3. Salve como "rescisao.html"\n4. Abra no navegador e use Ctrl+P para gerar PDF');
+                    } catch (err2) {
+                        alert('❌ Não foi possível copiar. Selecione o código manualmente.');
+                    }
+                    document.body.removeChild(textArea);
+                }
+            };
+
+            const loadExampleData = () => {
+                const exampleAnalysis = {
+                    id: `analysis-${Date.now()}`,
+                    ...EXEMPLO_WANESSA,
+                    status: 'completed',
+                    createdAt: new Date().toISOString(),
+                };
+                setAnalyses(prev => [exampleAnalysis, ...prev]);
+                setSelectedAnalysis(exampleAnalysis);
+                setCurrentView('detail');
+            };
+
+            // Renderização da lista
+            if (currentView === 'list') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h1 className="text-4xl font-bold text-blue-600 mb-2">
+                                            Analisador de Rescisões Trabalhistas
+                                        </h1>
+                                        <p className="text-gray-600 text-lg">
+                                            Análise automatizada com IA e geração de relatórios profissionais
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={loadExampleData}
+                                            className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+                                        >
+                                            <FileText className="w-5 h-5" />
+                                            Ver Exemplo
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentView('new')}
+                                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                            Nova Análise
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {analyses.length === 0 ? (
+                                <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+                                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                                        Nenhuma análise cadastrada
+                                    </h3>
+                                    <p className="text-gray-500 mb-6">
+                                        Comece fazendo upload de um documento de rescisão ou veja o exemplo
+                                    </p>
+                                    <div className="flex justify-center gap-4">
+                                        <button
+                                            onClick={loadExampleData}
+                                            className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+                                        >
+                                            <FileText className="w-5 h-5" />
+                                            Ver Exemplo
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentView('new')}
+                                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                            Nova Análise
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid gap-6">
+                                    {analyses.map((analysis) => (
+                                        <div
+                                            key={analysis.id}
+                                            className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedAnalysis(analysis);
+                                                setCurrentView('detail');
+                                            }}
+                                        >
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="text-xl font-bold text-gray-800">
+                                                            {analysis.employeeName}
+                                                        </h3>
+                                                        <span className="flex items-center gap-1 text-green-600 text-sm font-medium bg-green-50 px-3 py-1 rounded-full">
+                                                            <CheckCircle className="w-4 h-4" />
+                                                            Concluído
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-gray-600">{analysis.employerName}</p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteAnalysis(analysis.id);
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                                                <div>
+                                                    <p className="text-sm text-gray-500 mb-1">Créditos</p>
+                                                    <p className="text-lg font-bold text-green-600">
+                                                        {formatCurrency(analysis.totalCreditos)}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 mb-1">Débitos</p>
+                                                    <p className="text-lg font-bold text-red-600">
+                                                        {formatCurrency(analysis.totalDebitos)}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 mb-1">Valor Líquido</p>
+                                                    <p className="text-lg font-bold text-blue-600">
+                                                        {formatCurrency(analysis.valorLiquido)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mt-4">
+                                                Criado em {formatDate(analysis.createdAt)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            // Renderização do formulário de nova análise
+            if (currentView === 'new') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+                        <div className="max-w-3xl mx-auto">
+                            <button
+                                onClick={() => setCurrentView('list')}
+                                className="text-blue-600 hover:text-blue-700 mb-6 flex items-center gap-2"
+                            >
+                                ← Voltar
+                            </button>
+
+                            <div className="bg-white rounded-2xl shadow-lg p-8">
+                                <h2 className="text-3xl font-bold text-gray-800 mb-2">Nova Análise</h2>
+                                <p className="text-gray-600 mb-8">
+                                    Faça upload dos documentos para análise automática com IA
+                                </p>
+
+                                <div className="mb-6">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                        Termo de Rescisão (TRCT) *
+                                    </label>
+                                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
+                                        <input
+                                            type="file"
+                                            accept=".pdf"
+                                            onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                                            className="hidden"
+                                            id="termo-upload"
+                                        />
+                                        <label htmlFor="termo-upload" className="cursor-pointer">
+                                            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                            {termoFile ? (
+                                                <p className="text-green-600 font-medium">{termoFile.name}</p>
+                                            ) : (
+                                                <>
+                                                    <p className="text-gray-600 font-medium mb-1">
+                                                        Clique para fazer upload
+                                                    </p>
+                                                    <p className="text-sm text-gray-400">PDF - Máximo 10MB</p>
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="mb-8">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                        Valores FGTS (Preenchimento Manual - Opcional)
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-4 bg-blue-50 p-6 rounded-xl border border-blue-200">
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-2">Saldo FGTS (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={manualFgts.saldoFgts}
+                                                onChange={(e) => setManualFgts({...manualFgts, saldoFgts: e.target.value})}
+                                                placeholder="0,00"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-2">Multa 40% (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={manualFgts.multaFgts}
+                                                onChange={(e) => setManualFgts({...manualFgts, multaFgts: e.target.value})}
+                                                placeholder="0,00"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-600 mb-2">Total FGTS (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={manualFgts.totalFgts}
+                                                onChange={(e) => setManualFgts({...manualFgts, totalFgts: e.target.value})}
+                                                placeholder="0,00"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        💡 Preencha manualmente caso o documento não contenha informações de FGTS
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setCurrentView('list')}
+                                        className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                                        disabled={isProcessing}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={processAnalysis}
+                                        disabled={!termoFile || isProcessing}
+                                        className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {isProcessing ? (
+                                            <>
+                                                <Clock className="w-5 h-5 animate-spin" />
+                                                Processando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="w-5 h-5" />
+                                                Analisar Documentos
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Renderização dos detalhes da análise
+            if (currentView === 'detail' && selectedAnalysis) {
+                const creditos = selectedAnalysis.items.filter(item => item.tipo === 'credito');
+                const debitos = selectedAnalysis.items.filter(item => item.tipo === 'debito');
+
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+                        <div className="max-w-6xl mx-auto">
+                            <button
+                                onClick={() => {
+                                    setCurrentView('list');
+                                    setSelectedAnalysis(null);
+                                }}
+                                className="text-blue-600 hover:text-blue-700 mb-6 flex items-center gap-2"
+                            >
+                                ← Voltar
+                            </button>
+
+                            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                                <div className="flex items-start justify-between mb-6">
+                                    <div className="flex-1">
+                                        <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                                            {selectedAnalysis.employeeName}
+                                        </h1>
+                                        <p className="text-lg text-gray-600">{selectedAnalysis.employerName}</p>
+                                    </div>
+                                    <button
+                                        onClick={handlePrint}
+                                        className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                        Gerar Relatório
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6 mb-8">
+                                    <div>
+                                        <p className="text-sm text-gray-500 mb-1">Data da Rescisão</p>
+                                        <p className="text-lg font-semibold">{formatDate(selectedAnalysis.rescissionDate)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500 mb-1">Tipo de Rescisão</p>
+                                        <p className="text-lg font-semibold">{selectedAnalysis.rescissionType}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-xl">
+                                        <p className="text-sm text-gray-600 mb-2">Total de Créditos</p>
+                                        <p className="text-2xl font-bold text-green-600">
+                                            {formatCurrency(selectedAnalysis.totalCreditos)}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">Valores a receber</p>
+                                    </div>
+                                    <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-xl">
+                                        <p className="text-sm text-gray-600 mb-2">Total de Débitos</p>
+                                        <p className="text-2xl font-bold text-red-600">
+                                            {formatCurrency(selectedAnalysis.totalDebitos)}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">Descontos aplicados</p>
+                                    </div>
+                                    <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-xl">
+                                        <p className="text-sm text-gray-600 mb-2">Valor Líquido</p>
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            {formatCurrency(selectedAnalysis.valorLiquido)}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">Valor final a receber</p>
+                                    </div>
+                                </div>
+
+                                <div className="mb-8">
+                                    <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
+                                        💰 Valores a Receber
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {creditos.map((item, index) => (
+                                            <div key={index} className="border-l-4 border-green-500 bg-green-50 p-6 rounded-lg">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                                            {item.codigo}
+                                                        </span>
+                                                        <h4 className="font-bold text-gray-800">{item.descricao}</h4>
+                                                    </div>
+                                                    <span className="text-xl font-bold text-green-600">
+                                                        {formatCurrency(item.valor)}
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-600 text-sm mt-2">{item.explicacao}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {debitos.length > 0 && (
+                                    <div className="mb-8">
+                                        <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
+                                            📉 Descontos Aplicados
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {debitos.map((item, index) => (
+                                                <div key={index} className="border-l-4 border-red-500 bg-red-50 p-6 rounded-lg">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
+                                                                {item.codigo}
+                                                            </span>
+                                                            <h4 className="font-bold text-gray-800">{item.descricao}</h4>
+                                                        </div>
+                                                        <span className="text-xl font-bold text-red-600">
+                                                            {formatCurrency(item.valor)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-gray-600 text-sm mt-2">{item.explicacao}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedAnalysis.observacoes.length > 0 && (
+                                    <div className="bg-gray-50 rounded-xl p-6">
+                                        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                            📋 Informações sobre a Rescisão
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {selectedAnalysis.observacoes.map((obs, index) => (
+                                                <p key={index} className="text-gray-700 leading-relaxed">
+                                                    {obs}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal de impressão */}
+                        {showPrintModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                                    <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+                                        <h3 className="text-2xl font-bold text-gray-800">Relatório HTML</h3>
+                                        <button
+                                            onClick={() => setShowPrintModal(false)}
+                                            className="text-gray-500 hover:text-gray-700 text-2xl"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                    <div className="p-6">
+                                        <p className="text-gray-600 mb-4">
+                                            Copie o código HTML abaixo e salve como arquivo .html para gerar o PDF
+                                        </p>
+                                        <textarea
+                                            value={printHtml}
+                                            readOnly
+                                            className="w-full h-96 p-4 border border-gray-300 rounded-lg font-mono text-sm"
+                                        />
+                                        <div className="flex gap-4 mt-6">
+                                            <button
+                                                onClick={copyToClipboard}
+                                                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium"
+                                            >
+                                                Copiar HTML
+                                            </button>
+                                            <button
+                                                onClick={() => setShowPrintModal(false)}
+                                                className="flex-1 border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                                            >
+                                                Fechar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
+        // Renderizar aplicativo
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<RescissionAnalyzer />);
+    </script>
+</body>
+</html>

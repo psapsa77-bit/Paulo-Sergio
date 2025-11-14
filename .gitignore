@@ -53,6 +53,7 @@ output/
 !labor_termination_analyzer/templates/*.html
 !labor_termination_analyzer/examples/*.html
 !labor_termination_analyzer/examples/*.pdf
+!analisador-rescisao-standalone.html
 
 # Logs
 *.log
