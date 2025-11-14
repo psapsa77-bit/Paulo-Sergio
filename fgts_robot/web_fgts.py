@@ -88,6 +88,8 @@ def inicializar_sessao():
         st.session_state.resultados = None
     if 'logs' not in st.session_state:
         st.session_state.logs = []
+    if 'competencias_data' not in st.session_state:
+        st.session_state.competencias_data = None
 
 
 def validar_cnpj(cnpj: str) -> bool:
@@ -361,6 +363,11 @@ def main():
                                 st.success("✅ Processamento concluído com sucesso!")
                                 st.balloons()
 
+                                # Armazenar dados de competências na sessão
+                                if robo.dados_resultado:
+                                    st.session_state.competencias_data = robo.dados_resultado
+                                    adicionar_log(f"✅ {len(robo.competencias_encontradas)} competências encontradas")
+
                                 # Buscar arquivo de resultado mais recente
                                 arquivos_resultado = sorted(
                                     config.RESULTS_DIR.glob("*.xlsx"),
@@ -384,6 +391,100 @@ def main():
     with tab2:
         st.header("Resultados")
 
+        # Exibir competências encontradas (resultado principal)
+        if st.session_state.competencias_data:
+            st.success("🎉 Competências em Aberto Encontradas!")
+            st.divider()
+
+            dados = st.session_state.competencias_data
+
+            # Métricas principais
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "📅 Total de Competências",
+                    dados['total_competencias'],
+                    help="Número de competências em aberto encontradas"
+                )
+
+            with col2:
+                st.metric(
+                    "🏢 CNPJs Processados",
+                    len(dados['cnpjs_processados']),
+                    help="Número de empresas processadas"
+                )
+
+            with col3:
+                st.metric(
+                    "🕐 Data/Hora",
+                    dados['timestamp'].split()[1],
+                    help="Horário do processamento"
+                )
+
+            st.divider()
+
+            # Lista de CNPJs processados
+            st.subheader("🏢 Empresas Processadas")
+            for cnpj in dados['cnpjs_processados']:
+                st.code(formatar_cnpj(cnpj))
+
+            st.divider()
+
+            # Lista de competências
+            st.subheader("📅 Competências em Aberto")
+
+            # Exibir em colunas para melhor visualização
+            num_cols = 4
+            cols = st.columns(num_cols)
+
+            for i, comp in enumerate(dados['competencias_em_aberto']):
+                with cols[i % num_cols]:
+                    st.markdown(f"""
+                    <div class="info-box" style="text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">
+                        📆 {comp}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            st.divider()
+
+            # Download dos dados
+            st.subheader("💾 Exportar Resultados")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Download JSON
+                import json
+                json_str = json.dumps(dados, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="📥 Baixar JSON",
+                    data=json_str,
+                    file_name=f"competencias_{dados['timestamp'].replace(' ', '_').replace(':', '-')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+
+            with col2:
+                # Download Excel (se existir)
+                arquivos_excel = sorted(
+                    config.LOGS_DIR.glob("competencias_em_aberto_*.xlsx"),
+                    key=lambda x: x.stat().st_mtime,
+                    reverse=True
+                )
+                if arquivos_excel:
+                    with open(arquivos_excel[0], 'rb') as f:
+                        st.download_button(
+                            label="📥 Baixar Excel",
+                            data=f.read(),
+                            file_name=arquivos_excel[0].name,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+
+            st.divider()
+
+        # Arquivos Excel antigos (se existirem)
         if st.session_state.resultados:
             st.success(f"📊 Arquivo gerado: {st.session_state.resultados.name}")
 
@@ -415,8 +516,10 @@ def main():
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
-        else:
-            st.info("📭 Nenhum resultado disponível ainda. Execute um processamento primeiro.")
+
+        # Mensagem quando não há resultados
+        if not st.session_state.competencias_data and not st.session_state.resultados:
+            st.info("📭 Nenhum resultado disponível ainda. Execute um processamento na aba '🚀 Processar' para visualizar as competências em aberto.")
 
             # Listar resultados anteriores
             arquivos_anteriores = sorted(

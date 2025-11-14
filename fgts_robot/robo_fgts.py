@@ -53,6 +53,11 @@ class RoboFGTS:
         self.page: Optional[Page] = None
         self.dados_extraidos: List[Dict[str, Any]] = []
 
+        # Resultados do processamento
+        self.competencias_encontradas: List[str] = []
+        self.cnpjs_processados: List[str] = []
+        self.dados_resultado: Optional[Dict[str, Any]] = None
+
         self.logger.info("Robô FGTS inicializado")
 
     def _setup_logging(self):
@@ -3078,6 +3083,10 @@ class RoboFGTS:
             self.logger.info("")
 
             if competencias_encontradas:
+                # Armazenar dados na instância para acesso pela web interface
+                self.competencias_encontradas = competencias_encontradas
+                self.cnpjs_processados = lista_cnpj
+
                 # Preparar dados para exportação
                 dados_resultado = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -3085,6 +3094,7 @@ class RoboFGTS:
                     "total_competencias": len(competencias_encontradas),
                     "competencias_em_aberto": competencias_encontradas
                 }
+                self.dados_resultado = dados_resultado
 
                 # Mostrar resultado no log
                 self.logger.info(f"🏢 CNPJs Processados: {', '.join(lista_cnpj)}")
