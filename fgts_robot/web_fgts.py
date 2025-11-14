@@ -393,42 +393,76 @@ def main():
 
         # Exibir competências encontradas (resultado principal)
         if st.session_state.competencias_data:
-            st.success("🎉 Competências em Aberto Encontradas!")
+            st.success("🎉 Processamento Concluído!")
             st.divider()
 
             dados = st.session_state.competencias_data
 
             # Métricas principais
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
             with col1:
                 st.metric(
-                    "📅 Total de Competências",
-                    dados['total_competencias'],
-                    help="Número de competências em aberto encontradas"
+                    "🏢 Total de Empresas",
+                    dados.get('total_empresas_processadas', len(dados.get('resultados_por_empresa', []))),
+                    help="Número total de empresas processadas"
                 )
 
             with col2:
                 st.metric(
-                    "🏢 CNPJs Processados",
-                    len(dados['cnpjs_processados']),
-                    help="Número de empresas processadas"
+                    "✅ Com Competências",
+                    dados.get('empresas_com_competencias', 0),
+                    help="Empresas com guias em aberto"
                 )
 
             with col3:
                 st.metric(
-                    "🕐 Data/Hora",
-                    dados['timestamp'].split()[1],
-                    help="Horário do processamento"
+                    "📭 Sem Competências",
+                    dados.get('empresas_sem_competencias', 0),
+                    help="Empresas sem guias em aberto"
+                )
+
+            with col4:
+                st.metric(
+                    "📅 Competências Únicas",
+                    dados.get('total_competencias_unicas', 0),
+                    help="Total de competências únicas encontradas"
                 )
 
             st.divider()
 
-            # Lista de empresas processadas
-            st.subheader("🏢 Empresas Processadas")
+            # Detalhes por empresa
+            st.subheader("🏢 Detalhes por Empresa")
 
-            # Verificar se há informação de empresas com nome
-            if 'empresas' in dados and dados['empresas']:
+            # Verificar se há dados no novo formato (múltiplas empresas)
+            if 'resultados_por_empresa' in dados:
+                for resultado in dados['resultados_por_empresa']:
+                    with st.expander(f"📋 {resultado['nome']}", expanded=False):
+                        col1, col2 = st.columns([2, 1])
+
+                        with col1:
+                            st.markdown(f"**CNPJ:** `{formatar_cnpj(resultado['cnpj'])}`")
+                            st.markdown(f"**Status:** {resultado['status']}")
+
+                        with col2:
+                            if resultado['sucesso']:
+                                st.success("✅ Processado")
+                            else:
+                                st.error("❌ Erro")
+
+                        if resultado['total_competencias'] > 0:
+                            st.markdown(f"**Competências em Aberto:** {resultado['total_competencias']}")
+                            st.markdown("**Lista:**")
+                            for comp in resultado['competencias']:
+                                st.markdown(f"- 📆 {comp}")
+                        else:
+                            if resultado['sucesso']:
+                                st.info("ℹ️ Nenhuma guia em aberto")
+                            else:
+                                st.warning("⚠️ Não foi possível obter dados")
+
+            # Fallback: formato antigo (uma empresa)
+            elif 'empresas' in dados and dados['empresas']:
                 for emp in dados['empresas']:
                     with st.container():
                         col1, col2 = st.columns([3, 1])
@@ -436,27 +470,28 @@ def main():
                             st.markdown(f"**{emp['nome']}**")
                         with col2:
                             st.code(formatar_cnpj(emp['cnpj']))
-            else:
-                # Fallback: mostrar só CNPJs se não houver info de empresas
-                for cnpj in dados['cnpjs_processados']:
-                    st.code(formatar_cnpj(cnpj))
 
             st.divider()
 
-            # Lista de competências
-            st.subheader("📅 Competências em Aberto")
+            # Lista de competências únicas
+            competencias_exibir = dados.get('competencias_unicas', dados.get('competencias_em_aberto', []))
 
-            # Exibir em colunas para melhor visualização
-            num_cols = 4
-            cols = st.columns(num_cols)
+            if competencias_exibir and len(competencias_exibir) > 0:
+                st.subheader("📅 Competências Únicas Encontradas")
 
-            for i, comp in enumerate(dados['competencias_em_aberto']):
-                with cols[i % num_cols]:
-                    st.markdown(f"""
-                    <div class="info-box" style="text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        📆 {comp}
-                    </div>
-                    """, unsafe_allow_html=True)
+                # Exibir em colunas para melhor visualização
+                num_cols = 4
+                cols = st.columns(num_cols)
+
+                for i, comp in enumerate(competencias_exibir):
+                    with cols[i % num_cols]:
+                        st.markdown(f"""
+                        <div class="info-box" style="text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">
+                            📆 {comp}
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ Nenhuma competência em aberto foi encontrada em todas as empresas processadas.")
 
             st.divider()
 

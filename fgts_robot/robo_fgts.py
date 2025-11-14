@@ -57,6 +57,7 @@ class RoboFGTS:
         self.competencias_encontradas: List[str] = []
         self.cnpjs_processados: List[str] = []
         self.nomes_empresas: Dict[str, str] = {}  # Mapeia CNPJ -> Nome da empresa
+        self.resultados_por_empresa: List[Dict[str, Any]] = []  # Lista com resultados de cada empresa
         self.dados_resultado: Optional[Dict[str, Any]] = None
 
         self.logger.info("Robô FGTS inicializado")
@@ -1597,6 +1598,62 @@ class RoboFGTS:
             self.logger.warning(f"⚠️  Erro ao capturar nome da empresa: {str(e)}")
             self.logger.warning(f"Usando CNPJ como nome: {cnpj}")
             return cnpj
+
+    async def _voltar_pagina_inicial(self) -> bool:
+        """
+        Retorna à página inicial do portal FGTS Digital
+
+        Returns:
+            bool: True se conseguiu voltar, False caso contrário
+        """
+        try:
+            self.logger.info("=" * 70)
+            self.logger.info("🔙 RETORNANDO À PÁGINA INICIAL...")
+            self.logger.info("=" * 70)
+
+            # Tentar clicar no logo/link para home
+            seletores_home = [
+                "a[href='/']",
+                "a[href='/portal']",
+                "a.logo",
+                ".logo a",
+                "a:has-text('Início')",
+                "a:has-text('Home')",
+                ".navbar-brand",
+                "header a[href*='portal']"
+            ]
+
+            clicou_home = False
+            for seletor in seletores_home:
+                try:
+                    elemento = await self.page.query_selector(seletor)
+                    if elemento and await elemento.is_visible():
+                        await elemento.click()
+                        clicou_home = True
+                        self.logger.info("✅ Clicado em link para página inicial")
+                        break
+                except:
+                    continue
+
+            # Se não conseguiu clicar, navegar via URL
+            if not clicou_home:
+                self.logger.info("Navegando via URL para página inicial...")
+                await self.page.goto(config.FGTS_URL_LOGIN, wait_until="networkidle", timeout=30000)
+                self.logger.info("✅ Navegado para página inicial")
+
+            # Aguardar carregamento
+            await asyncio.sleep(3)
+
+            self.logger.info("=" * 70)
+            self.logger.info("✅ Retornou à página inicial!")
+            self.logger.info("=" * 70)
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao voltar à página inicial: {str(e)}")
+            self.logger.exception("Traceback:")
+            return False
 
     async def _buscar_competencias_em_aberto(self) -> List[str]:
         """
@@ -3141,142 +3198,237 @@ class RoboFGTS:
 
             self.logger.info("")
 
-            # Trocar perfil para procurador (para cada CNPJ)
-            # Isso permite acessar dados das empresas via procuração eletrônica
-            for cnpj in lista_cnpj:
-                try:
-                    self.logger.info("")
-                    sucesso_troca = await self._trocar_perfil_procurador(cnpj)
-
-                    if sucesso_troca:
-                        # Capturar nome da empresa após troca de perfil
-                        nome_empresa = await self._capturar_nome_empresa(cnpj)
-                        self.nomes_empresas[cnpj] = nome_empresa
-                        self.logger.info(f"📋 Empresa: {nome_empresa}")
-
-                    break  # Só precisa trocar uma vez para a primeira empresa
-                except Exception as e:
-                    self.logger.warning(f"Erro ao trocar perfil para {cnpj}: {str(e)}")
-                    self.logger.warning("Continuando com processamento...")
-
+            # ============================================================
+            # PROCESSAR CADA CNPJ DA LISTA
+            # ============================================================
+            self.logger.info("="*70)
+            self.logger.info(f"📋 PROCESSANDO {len(lista_cnpj)} EMPRESA(S)")
+            self.logger.info("="*70)
             self.logger.info("")
 
-            # Buscar competências em aberto
-            try:
-                self.logger.info("")
-                competencias_encontradas = await self._buscar_competencias_em_aberto()
+            # Processar cada CNPJ individualmente
+            for index, cnpj in enumerate(lista_cnpj, 1):
+                self.logger.info("="*70)
+                self.logger.info(f"🏢 PROCESSANDO EMPRESA {index}/{len(lista_cnpj)}")
+                self.logger.info(f"   CNPJ: {cnpj}")
+                self.logger.info("="*70)
 
-                if competencias_encontradas:
-                    self.logger.info(f"✅ Total de competências em aberto: {len(competencias_encontradas)}")
-                else:
-                    self.logger.warning("⚠️  Nenhuma competência em aberto encontrada")
-                    competencias_encontradas = []
+                try:
+                    # Passo 1: Trocar perfil para o CNPJ atual
+                    self.logger.info("")
+                    self.logger.info(f"📌 Passo 1: Trocar perfil para CNPJ {cnpj}")
+                    sucesso_troca = await self._trocar_perfil_procurador(cnpj)
 
-            except Exception as e:
-                self.logger.warning(f"Erro ao buscar competências: {str(e)}")
-                self.logger.warning("Continuando com processamento...")
-                competencias_encontradas = []
+                    if not sucesso_troca:
+                        self.logger.error(f"❌ Falha ao trocar perfil para {cnpj}")
+                        # Registrar empresa sem dados
+                        self.resultados_por_empresa.append({
+                            "cnpj": cnpj,
+                            "nome": cnpj,
+                            "competencias": [],
+                            "total_competencias": 0,
+                            "status": "Erro ao trocar perfil",
+                            "sucesso": False
+                        })
+                        # Se não for a última empresa, voltar à página inicial
+                        if index < len(lista_cnpj):
+                            await self._voltar_pagina_inicial()
+                        continue
+
+                    # Passo 2: Capturar nome da empresa
+                    self.logger.info("")
+                    self.logger.info(f"📌 Passo 2: Capturar nome da empresa")
+                    nome_empresa = await self._capturar_nome_empresa(cnpj)
+                    self.nomes_empresas[cnpj] = nome_empresa
+                    self.logger.info(f"✅ Empresa: {nome_empresa}")
+
+                    # Passo 3: Buscar competências em aberto
+                    self.logger.info("")
+                    self.logger.info(f"📌 Passo 3: Buscar competências em aberto")
+
+                    competencias_encontradas = await self._buscar_competencias_em_aberto()
+
+                    if competencias_encontradas and len(competencias_encontradas) > 0:
+                        self.logger.info(f"✅ {len(competencias_encontradas)} competência(s) em aberto encontrada(s)")
+
+                        # Registrar resultado da empresa
+                        self.resultados_por_empresa.append({
+                            "cnpj": cnpj,
+                            "nome": nome_empresa,
+                            "competencias": competencias_encontradas,
+                            "total_competencias": len(competencias_encontradas),
+                            "status": "Competências encontradas",
+                            "sucesso": True
+                        })
+                    else:
+                        self.logger.warning(f"⚠️  Nenhuma competência em aberto encontrada para {nome_empresa}")
+
+                        # Registrar empresa sem competências
+                        self.resultados_por_empresa.append({
+                            "cnpj": cnpj,
+                            "nome": nome_empresa,
+                            "competencias": [],
+                            "total_competencias": 0,
+                            "status": "Nenhuma guia em aberto",
+                            "sucesso": True
+                        })
+
+                    # Passo 4: Se não for a última empresa, voltar à página inicial
+                    if index < len(lista_cnpj):
+                        self.logger.info("")
+                        self.logger.info(f"📌 Passo 4: Retornar à página inicial para processar próxima empresa")
+                        await self._voltar_pagina_inicial()
+                        await asyncio.sleep(2)  # Aguardar um pouco antes de processar próximo CNPJ
+
+                    self.logger.info("")
+                    self.logger.info(f"✅ Empresa {index}/{len(lista_cnpj)} processada com sucesso!")
+                    self.logger.info("")
+
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao processar CNPJ {cnpj}: {str(e)}")
+                    self.logger.exception("Traceback:")
+
+                    # Registrar empresa com erro
+                    self.resultados_por_empresa.append({
+                        "cnpj": cnpj,
+                        "nome": self.nomes_empresas.get(cnpj, cnpj),
+                        "competencias": [],
+                        "total_competencias": 0,
+                        "status": f"Erro: {str(e)}",
+                        "sucesso": False
+                    })
+
+                    # Se não for a última empresa, tentar voltar à página inicial
+                    if index < len(lista_cnpj):
+                        try:
+                            await self._voltar_pagina_inicial()
+                        except:
+                            self.logger.error("❌ Erro ao voltar à página inicial. Continuando...")
 
             self.logger.info("")
 
             # ============================================================
-            # RESULTADO FINAL: COMPETÊNCIAS ENCONTRADAS
+            # RESULTADO FINAL: CONSOLIDAÇÃO DE TODAS AS EMPRESAS
             # ============================================================
             self.logger.info("="*70)
             self.logger.info("📊 RESULTADO FINAL DO PROCESSAMENTO")
             self.logger.info("="*70)
             self.logger.info("")
 
-            if competencias_encontradas:
-                # Armazenar dados na instância para acesso pela web interface
-                self.competencias_encontradas = competencias_encontradas
-                self.cnpjs_processados = lista_cnpj
+            # Armazenar dados consolidados
+            self.cnpjs_processados = lista_cnpj
 
-                # Preparar lista de empresas com CNPJ e nome
-                empresas_info = []
-                for cnpj in lista_cnpj:
-                    nome = self.nomes_empresas.get(cnpj, cnpj)
-                    empresas_info.append({
-                        "cnpj": cnpj,
-                        "nome": nome
-                    })
+            # Consolidar todas as competências únicas
+            todas_competencias = set()
+            empresas_com_competencias = 0
+            empresas_sem_competencias = 0
+            empresas_com_erro = 0
 
-                # Preparar dados para exportação
-                dados_resultado = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "cnpjs_processados": lista_cnpj,
-                    "empresas": empresas_info,
-                    "total_competencias": len(competencias_encontradas),
-                    "competencias_em_aberto": competencias_encontradas
-                }
-                self.dados_resultado = dados_resultado
+            for resultado in self.resultados_por_empresa:
+                if resultado['sucesso']:
+                    if resultado['total_competencias'] > 0:
+                        empresas_com_competencias += 1
+                        todas_competencias.update(resultado['competencias'])
+                    else:
+                        empresas_sem_competencias += 1
+                else:
+                    empresas_com_erro += 1
 
-                # Mostrar resultado no log
-                self.logger.info(f"🏢 Empresas Processadas:")
-                for emp in empresas_info:
-                    self.logger.info(f"   • {emp['nome']}")
-                    self.logger.info(f"     CNPJ: {emp['cnpj']}")
+            todas_competencias = sorted(list(todas_competencias))
+            self.competencias_encontradas = todas_competencias
+
+            # Preparar dados para exportação
+            dados_resultado = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "total_empresas_processadas": len(lista_cnpj),
+                "empresas_com_competencias": empresas_com_competencias,
+                "empresas_sem_competencias": empresas_sem_competencias,
+                "empresas_com_erro": empresas_com_erro,
+                "total_competencias_unicas": len(todas_competencias),
+                "competencias_unicas": todas_competencias,
+                "resultados_por_empresa": self.resultados_por_empresa
+            }
+            self.dados_resultado = dados_resultado
+
+            # Mostrar resultado no log
+            self.logger.info("📊 RESUMO GERAL:")
+            self.logger.info(f"   • Total de empresas processadas: {len(lista_cnpj)}")
+            self.logger.info(f"   • Empresas com competências: {empresas_com_competencias}")
+            self.logger.info(f"   • Empresas sem competências: {empresas_sem_competencias}")
+            self.logger.info(f"   • Empresas com erro: {empresas_com_erro}")
+            self.logger.info("")
+
+            self.logger.info("🏢 DETALHES POR EMPRESA:")
+            for resultado in self.resultados_por_empresa:
                 self.logger.info("")
-                self.logger.info(f"📋 Total de Competências em Aberto: {len(competencias_encontradas)}")
+                self.logger.info(f"   📋 {resultado['nome']}")
+                self.logger.info(f"      CNPJ: {resultado['cnpj']}")
+                self.logger.info(f"      Status: {resultado['status']}")
+                if resultado['total_competencias'] > 0:
+                    self.logger.info(f"      Competências: {', '.join(resultado['competencias'])}")
+                else:
+                    self.logger.info(f"      Competências: Nenhuma")
+
+            if len(todas_competencias) > 0:
                 self.logger.info("")
-                self.logger.info("📅 Competências Encontradas:")
-                for i, comp in enumerate(competencias_encontradas, 1):
+                self.logger.info(f"📅 COMPETÊNCIAS ÚNICAS ENCONTRADAS ({len(todas_competencias)}):")
+                for i, comp in enumerate(todas_competencias, 1):
                     self.logger.info(f"  {i}. {comp}")
-                self.logger.info("")
 
-                # Salvar resultado em JSON
-                try:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    resultado_path = config.LOGS_DIR / f"resultado_final_{timestamp}.json"
-                    with open(resultado_path, 'w', encoding='utf-8') as f:
-                        json.dump(dados_resultado, f, ensure_ascii=False, indent=2)
-                    self.logger.info(f"💾 Resultado salvo em JSON: {resultado_path}")
-                except Exception as e:
-                    self.logger.warning(f"Erro ao salvar JSON: {str(e)}")
+            self.logger.info("")
 
-                # Salvar resultado em Excel
-                try:
-                    import pandas as pd
+            # Salvar resultado em JSON
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                resultado_path = config.LOGS_DIR / f"resultado_final_{timestamp}.json"
+                with open(resultado_path, 'w', encoding='utf-8') as f:
+                    json.dump(dados_resultado, f, ensure_ascii=False, indent=2)
+                self.logger.info(f"💾 Resultado salvo em JSON: {resultado_path}")
+            except Exception as e:
+                self.logger.warning(f"Erro ao salvar JSON: {str(e)}")
 
-                    # Pegar informações da primeira empresa (principal)
-                    cnpj_principal = lista_cnpj[0]
-                    nome_principal = self.nomes_empresas.get(cnpj_principal, cnpj_principal)
+            # Salvar resultado em Excel
+            try:
+                import pandas as pd
 
-                    # Criar DataFrame com as competências
-                    df = pd.DataFrame({
-                        'Empresa': [nome_principal] * len(competencias_encontradas),
-                        'CNPJ': [cnpj_principal] * len(competencias_encontradas),
-                        'Competência': competencias_encontradas,
-                        'Status': ['Em Aberto'] * len(competencias_encontradas)
-                    })
+                # Criar DataFrame com todas as empresas e suas competências
+                linhas = []
+                for resultado in self.resultados_por_empresa:
+                    if resultado['total_competencias'] > 0:
+                        for comp in resultado['competencias']:
+                            linhas.append({
+                                'Empresa': resultado['nome'],
+                                'CNPJ': resultado['cnpj'],
+                                'Competência': comp,
+                                'Status': resultado['status']
+                            })
+                    else:
+                        linhas.append({
+                            'Empresa': resultado['nome'],
+                            'CNPJ': resultado['cnpj'],
+                            'Competência': '-',
+                            'Status': resultado['status']
+                        })
 
+                if linhas:
+                    df = pd.DataFrame(linhas)
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     excel_path = config.LOGS_DIR / f"competencias_em_aberto_{timestamp}.xlsx"
                     df.to_excel(excel_path, index=False, sheet_name='Competências')
                     self.logger.info(f"📊 Resultado salvo em Excel: {excel_path}")
-                except ImportError:
-                    self.logger.warning("⚠️  Pandas não instalado. Excel não foi gerado.")
-                    self.logger.warning("   Instale com: pip install pandas openpyxl")
-                except Exception as e:
-                    self.logger.warning(f"Erro ao salvar Excel: {str(e)}")
+            except ImportError:
+                self.logger.warning("⚠️  Pandas não instalado. Excel não foi gerado.")
+                self.logger.warning("   Instale com: pip install pandas openpyxl")
+            except Exception as e:
+                self.logger.warning(f"Erro ao salvar Excel: {str(e)}")
 
-                self.logger.info("")
-                self.logger.info("="*70)
-                self.logger.info("✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!")
-                self.logger.info("="*70)
-                return True
+            self.logger.info("")
+            self.logger.info("="*70)
+            self.logger.info("✅ PROCESSAMENTO CONCLUÍDO!")
+            self.logger.info("="*70)
 
-            else:
-                self.logger.warning("="*70)
-                self.logger.warning("⚠️  NENHUMA COMPETÊNCIA ENCONTRADA")
-                self.logger.warning("="*70)
-                self.logger.warning("")
-                self.logger.warning("Possíveis causas:")
-                self.logger.warning("  1. Não há débitos em aberto para esta empresa")
-                self.logger.warning("  2. O dropdown não abriu corretamente")
-                self.logger.warning("  3. Verifique os screenshots em logs/")
-                self.logger.warning("")
-                return False
+            # Retornar True se processou pelo menos uma empresa com sucesso
+            return len(self.resultados_por_empresa) > 0
 
             # ============================================================
             # ETAPA 4 DESABILITADA - NÃO PROCESSAR EMPRESAS
