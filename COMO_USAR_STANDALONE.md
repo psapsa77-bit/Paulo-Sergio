@@ -30,34 +30,23 @@ Este é um **arquivo HTML único** que funciona diretamente no navegador, sem in
 
 ---
 
-## ⚙️ Configurar API Claude (Opcional)
+## ⚙️ Configurar API Claude (SUPER FÁCIL!)
 
-Para usar a análise automática com IA:
+Agora você configura a API direto na interface:
 
-1. **Obtenha uma API Key** em: https://console.anthropic.com/
+### Método 1: Via Interface (RECOMENDADO) ⭐
+1. **Abra o aplicativo** no navegador
+2. **Clique em ⚙️ Configurações** (canto superior direito)
+3. **Cole sua API Key** da Anthropic
+4. **Clique em "Salvar"**
+5. **Pronto!** A chave fica salva no navegador
 
-2. **Abra o arquivo** `analisador-rescisao-standalone.html` em um editor de texto
-
-3. **Procure pela linha** (~linha 327):
-```javascript
-headers: {
-    "Content-Type": "application/json",
-    // ADICIONE SUA API KEY AQUI:
-    // "x-api-key": "sua_api_key_aqui",
-    // "anthropic-version": "2023-06-01"
-},
-```
-
-4. **Descomente e adicione** sua API key:
-```javascript
-headers: {
-    "Content-Type": "application/json",
-    "x-api-key": "sk-ant-api03-XXXXX", // Sua API key aqui
-    "anthropic-version": "2023-06-01"
-},
-```
-
-5. **Salve o arquivo** e recarregue no navegador
+### Método 2: Obter API Key
+1. Acesse: https://console.anthropic.com/
+2. Faça login ou crie uma conta
+3. Vá em "API Keys"
+4. Crie uma nova chave
+5. Copie e cole na interface do app
 
 **Nota:** Se não configurar a API, o aplicativo usará automaticamente dados de exemplo!
 
@@ -96,16 +85,24 @@ Funciona em todos os navegadores modernos:
 
 ---
 
-## 💾 Como Gerar PDF do Relatório
+## 💾 Como Gerar PDF do Relatório (NOVO - MUITO MAIS FÁCIL!)
 
-1. Clique em **"Gerar Relatório"** em uma análise
-2. Clique em **"Copiar HTML"**
-3. Abra o **Bloco de Notas** (ou outro editor de texto)
-4. Cole o código (Ctrl+V)
-5. Salve como: `relatorio-rescisao.html`
-6. Abra o arquivo no navegador
-7. Pressione **Ctrl+P** para imprimir
-8. Escolha **"Salvar como PDF"**
+### Método 1: Impressão Direta (SUPER RÁPIDO) 🚀
+1. Abra uma análise
+2. Clique em **🖨️ Imprimir**
+3. O navegador abre a janela de impressão automaticamente
+4. Escolha **"Salvar como PDF"**
+5. **Pronto!**
+
+### Método 2: Download HTML
+1. Abra uma análise
+2. Clique em **📥 Baixar HTML**
+3. O arquivo é baixado automaticamente
+4. Abra o arquivo HTML no navegador
+5. Pressione **Ctrl+P**
+6. Escolha **"Salvar como PDF"**
+
+**Nota:** O arquivo HTML baixado pode ser aberto em qualquer navegador e compartilhado!
 
 ---
 

@@ -22,13 +22,19 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         // Componentes de ícones SVG
         const FileText = ({ className = "w-6 h-6" }) => (
@@ -70,6 +76,19 @@
         const Plus = ({ className = "w-6 h-6" }) => (
             <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+        );
+
+        const Settings = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        );
+
+        const Printer = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
         );
 
@@ -157,8 +176,26 @@
                 multaFgts: '',
                 totalFgts: ''
             });
-            const [showPrintModal, setShowPrintModal] = useState(false);
-            const [printHtml, setPrintHtml] = useState('');
+            const [showSettingsModal, setShowSettingsModal] = useState(false);
+            const [apiKey, setApiKey] = useState('');
+
+            // Carregar API Key do localStorage ao iniciar
+            useEffect(() => {
+                const savedKey = localStorage.getItem('anthropic_api_key');
+                if (savedKey) {
+                    setApiKey(savedKey);
+                }
+            }, []);
+
+            const saveApiKey = () => {
+                if (apiKey.trim()) {
+                    localStorage.setItem('anthropic_api_key', apiKey.trim());
+                    alert('✅ API Key salva com sucesso!\n\nAgora você pode fazer análises automáticas com IA.');
+                    setShowSettingsModal(false);
+                } else {
+                    alert('⚠️ Por favor, insira uma API Key válida.');
+                }
+            };
 
             const handleFileChange = (file) => {
                 setTermoFile(file);
@@ -178,6 +215,12 @@
             };
 
             const analyzeDocumentWithClaude = async (termoFile, manualFgts) => {
+                const savedApiKey = localStorage.getItem('anthropic_api_key');
+
+                if (!savedApiKey) {
+                    throw new Error('API Key não configurada. Configure nas Configurações (⚙️).');
+                }
+
                 const termoBase64 = await fileToBase64(termoFile);
 
                 const promptText = `Você é um especialista em legislação trabalhista brasileira. Analise o Termo de Rescisão do Contrato de Trabalho (TRCT) fornecido e extraia TODAS as informações detalhadas.
@@ -236,9 +279,8 @@ IMPORTANTE:
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        // ADICIONE SUA API KEY AQUI:
-                        // "x-api-key": "sua_api_key_aqui",
-                        // "anthropic-version": "2023-06-01"
+                        "x-api-key": savedApiKey,
+                        "anthropic-version": "2023-06-01"
                     },
                     body: JSON.stringify({
                         model: "claude-sonnet-4-20250514",
@@ -318,7 +360,9 @@ IMPORTANTE:
                     } catch (apiError) {
                         console.error('Erro na API, usando dados de exemplo:', apiError);
                         analysisData = EXEMPLO_WANESSA;
-                        alert('⚠️ A API Claude está temporariamente indisponível ou ocorreu um erro.\n\nExibindo dados de exemplo (Wanessa Nascimento Sousa) para demonstração.\n\nVerifique o console (F12) para detalhes do erro.');
+
+                        const errorMsg = apiError.message || 'Erro desconhecido';
+                        alert(`⚠️ ${errorMsg}\n\nExibindo dados de exemplo (Wanessa Nascimento Sousa) para demonstração.\n\nPara usar a análise real:\n1. Clique em ⚙️ Configurações\n2. Cole sua API Key da Anthropic\n3. Tente novamente`);
                     }
 
                     const completedAnalysis = {
@@ -458,31 +502,30 @@ Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().t
 </html>`;
             };
 
-            const handlePrint = () => {
+            const downloadHtmlReport = () => {
                 const html = generatePrintHtml();
-                setPrintHtml(html);
-                setShowPrintModal(true);
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `rescisao-${selectedAnalysis.employeeName.replace(/\s+/g, '-')}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                alert('✅ Relatório baixado!\n\n1. Abra o arquivo HTML baixado\n2. Pressione Ctrl+P para imprimir\n3. Escolha "Salvar como PDF"');
             };
 
-            const copyToClipboard = async () => {
-                try {
-                    await navigator.clipboard.writeText(printHtml);
-                    alert('✅ HTML copiado!\n\n1. Abra um editor de texto (Notepad, VS Code, etc.)\n2. Cole o conteúdo (Ctrl+V)\n3. Salve como "rescisao.html"\n4. Abra no navegador e use Ctrl+P para gerar PDF');
-                } catch (err) {
-                    const textArea = document.createElement('textarea');
-                    textArea.value = printHtml;
-                    textArea.style.position = 'fixed';
-                    textArea.style.left = '-999999px';
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        alert('✅ HTML copiado!\n\n1. Abra um editor de texto (Notepad, VS Code, etc.)\n2. Cole o conteúdo (Ctrl+V)\n3. Salve como "rescisao.html"\n4. Abra no navegador e use Ctrl+P para gerar PDF');
-                    } catch (err2) {
-                        alert('❌ Não foi possível copiar. Selecione o código manualmente.');
-                    }
-                    document.body.removeChild(textArea);
-                }
+            const printDirect = () => {
+                const html = generatePrintHtml();
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(html);
+                printWindow.document.close();
+
+                setTimeout(() => {
+                    printWindow.print();
+                }, 500);
             };
 
             const loadExampleData = () => {
@@ -513,6 +556,14 @@ Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().t
                                         </p>
                                     </div>
                                     <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowSettingsModal(true)}
+                                            className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+                                            title="Configurar API Key"
+                                        >
+                                            <Settings className="w-5 h-5" />
+                                            Configurações
+                                        </button>
                                         <button
                                             onClick={loadExampleData}
                                             className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-200 transition-colors"
@@ -619,6 +670,70 @@ Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().t
                                 </div>
                             )}
                         </div>
+
+                        {/* Modal de Configurações */}
+                        {showSettingsModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
+                                <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full">
+                                    <div className="bg-blue-600 text-white p-6 rounded-t-2xl">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <Settings className="w-8 h-8" />
+                                                <h3 className="text-2xl font-bold">Configurações</h3>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowSettingsModal(false)}
+                                                className="text-white hover:bg-blue-700 rounded-lg p-2 transition-colors"
+                                            >
+                                                <span className="text-2xl">×</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-6">
+                                        <div className="mb-6">
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                API Key da Anthropic (Claude)
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={apiKey}
+                                                onChange={(e) => setApiKey(e.target.value)}
+                                                placeholder="sk-ant-api03-XXXXXXXXXXXXXXXXXXXXXXX"
+                                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                            />
+                                            <p className="text-sm text-gray-500 mt-2">
+                                                💡 Obtenha sua API Key em: <a href="https://console.anthropic.com/" target="_blank" className="text-blue-600 hover:underline">console.anthropic.com</a>
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+                                            <h4 className="font-bold text-blue-900 mb-2">Como configurar:</h4>
+                                            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                                                <li>Acesse <a href="https://console.anthropic.com/" target="_blank" className="underline">console.anthropic.com</a></li>
+                                                <li>Faça login ou crie uma conta</li>
+                                                <li>Vá em "API Keys" e crie uma nova chave</li>
+                                                <li>Cole a chave aqui e clique em "Salvar"</li>
+                                            </ol>
+                                        </div>
+
+                                        <div className="flex gap-4">
+                                            <button
+                                                onClick={() => setShowSettingsModal(false)}
+                                                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                onClick={saveApiKey}
+                                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+                                            >
+                                                Salvar API Key
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
@@ -771,13 +886,24 @@ Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().t
                                         </h1>
                                         <p className="text-lg text-gray-600">{selectedAnalysis.employerName}</p>
                                     </div>
-                                    <button
-                                        onClick={handlePrint}
-                                        className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
-                                    >
-                                        <Download className="w-5 h-5" />
-                                        Gerar Relatório
-                                    </button>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={printDirect}
+                                            className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition-colors shadow-lg"
+                                            title="Imprimir diretamente"
+                                        >
+                                            <Printer className="w-5 h-5" />
+                                            Imprimir
+                                        </button>
+                                        <button
+                                            onClick={downloadHtmlReport}
+                                            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+                                            title="Baixar arquivo HTML"
+                                        >
+                                            <Download className="w-5 h-5" />
+                                            Baixar HTML
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-6 mb-8">
@@ -881,47 +1007,6 @@ Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().t
                                 )}
                             </div>
                         </div>
-
-                        {/* Modal de impressão */}
-                        {showPrintModal && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                                    <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-                                        <h3 className="text-2xl font-bold text-gray-800">Relatório HTML</h3>
-                                        <button
-                                            onClick={() => setShowPrintModal(false)}
-                                            className="text-gray-500 hover:text-gray-700 text-2xl"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                    <div className="p-6">
-                                        <p className="text-gray-600 mb-4">
-                                            Copie o código HTML abaixo e salve como arquivo .html para gerar o PDF
-                                        </p>
-                                        <textarea
-                                            value={printHtml}
-                                            readOnly
-                                            className="w-full h-96 p-4 border border-gray-300 rounded-lg font-mono text-sm"
-                                        />
-                                        <div className="flex gap-4 mt-6">
-                                            <button
-                                                onClick={copyToClipboard}
-                                                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium"
-                                            >
-                                                Copiar HTML
-                                            </button>
-                                            <button
-                                                onClick={() => setShowPrintModal(false)}
-                                                className="flex-1 border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                                            >
-                                                Fechar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 );
             }
