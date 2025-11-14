@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs e Resultados
+logs/*.log
+results/*.html
+results/*.json
+results/*.xlsx
+
+# Configurações sensíveis
+config/certificado.pfx
+config/certificado.p12
+config/*.pfx
+config/*.p12
+
+# Dados de empresas (pode conter informações sensíveis)
+config/empresas.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporários
+*.tmp
+*.temp
+.cache/
+
+# Playwright
+.playwright/

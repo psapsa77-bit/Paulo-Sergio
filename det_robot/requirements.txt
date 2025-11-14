@@ -1,0 +1,15 @@
+# Robô DET - Verificador de Mensagens
+# Dependências necessárias para o projeto
+
+# Web automation
+playwright>=1.40.0
+
+# Web interface
+streamlit>=1.31.0
+
+# Data handling
+# (built-in: json, pathlib, datetime, asyncio, logging)
+
+# Instalação do Playwright:
+# Após instalar as dependências, execute:
+# python -m playwright install chromium

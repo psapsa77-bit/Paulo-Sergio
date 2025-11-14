@@ -1,0 +1,14 @@
+[
+  {
+    "nome": "Empresa Exemplo 1 Ltda",
+    "cnpj": "12345678000199"
+  },
+  {
+    "nome": "Empresa Exemplo 2 Ltda",
+    "cnpj": "98765432000188"
+  },
+  {
+    "nome": "Empresa Exemplo 3 S/A",
+    "cnpj": "11223344000155"
+  }
+]
