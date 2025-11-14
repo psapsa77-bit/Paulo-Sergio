@@ -1926,8 +1926,178 @@ class RoboFGTS:
             self.logger.info("✅ ANÁLISE DA PÁGINA CONCLUÍDA!")
             self.logger.info("=" * 70)
 
-            # Retornar vazio por enquanto (depois você me diz o que fazer)
-            return []
+            # AGORA VAMOS EXTRAIR AS COMPETÊNCIAS
+            self.logger.info("")
+            self.logger.info("=" * 70)
+            self.logger.info("📋 EXTRAINDO COMPETÊNCIAS EM ABERTO...")
+            self.logger.info("=" * 70)
+
+            competencias = []
+
+            try:
+                # Procurar campo de competência pelo ID
+                self.logger.info("🔍 Procurando campo 'selectCompetencia'...")
+                campo_competencia = await self.page.query_selector('#selectCompetencia')
+
+                if not campo_competencia:
+                    self.logger.error("❌ Campo 'selectCompetencia' não encontrado")
+                    await self._screenshot_erro("campo_competencia_nao_encontrado")
+                    return []
+
+                self.logger.info("✅ Campo encontrado!")
+
+                # Clicar no campo para abrir o dropdown
+                self.logger.info("🖱️  Clicando no campo para abrir dropdown...")
+                await campo_competencia.click()
+
+                # Aguardar dropdown abrir
+                self.logger.info("⏳ Aguardando dropdown abrir (5 segundos)...")
+                await asyncio.sleep(5)
+
+                # Procurar lista de opções que apareceu
+                self.logger.info("🔍 Procurando lista de opções...")
+
+                # Tentar vários seletores para encontrar o dropdown
+                opcoes_encontradas = await self.page.evaluate("""
+                    () => {
+                        const opcoes = [];
+
+                        // Procurar por listas visíveis (ul, ol, div com role listbox, etc)
+                        const listas = document.querySelectorAll('ul, ol, [role="listbox"], [role="menu"], .dropdown-menu, .options, .select-options');
+
+                        for (const lista of listas) {
+                            // Verificar se está visível
+                            if (!(lista.offsetWidth || lista.offsetHeight || lista.getClientRects().length)) {
+                                continue;
+                            }
+
+                            // Pegar itens da lista
+                            const itens = lista.querySelectorAll('li, [role="option"], .option, .item');
+
+                            for (const item of itens) {
+                                const texto = item.innerText ? item.innerText.trim() : '';
+                                const valor = item.getAttribute('data-value') ||
+                                             item.getAttribute('value') ||
+                                             texto;
+
+                                if (texto && texto.length > 0) {
+                                    // Filtrar opções que parecem ser competências (formato MM/YYYY ou similar)
+                                    opcoes.push({
+                                        texto: texto,
+                                        valor: valor
+                                    });
+                                }
+                            }
+
+                            // Se encontrou opções, sair
+                            if (opcoes.length > 0) {
+                                break;
+                            }
+                        }
+
+                        return opcoes;
+                    }
+                """)
+
+                if opcoes_encontradas and len(opcoes_encontradas) > 0:
+                    self.logger.info(f"✅ Encontradas {len(opcoes_encontradas)} competências:")
+                    for i, opcao in enumerate(opcoes_encontradas, 1):
+                        competencias.append(opcao['texto'])
+                        self.logger.info(f"  {i}. {opcao['texto']}")
+                else:
+                    # Tentar método alternativo: verificar se há um select oculto
+                    self.logger.warning("⚠️  Dropdown não encontrado visualmente, tentando método alternativo...")
+
+                    # Procurar por select associado ou datalist
+                    opcoes_alternativas = await self.page.evaluate("""
+                        () => {
+                            const opcoes = [];
+
+                            // Procurar datalist associado ao input
+                            const input = document.getElementById('selectCompetencia');
+                            if (input && input.getAttribute('list')) {
+                                const datalistId = input.getAttribute('list');
+                                const datalist = document.getElementById(datalistId);
+
+                                if (datalist) {
+                                    const options = datalist.querySelectorAll('option');
+                                    for (const opt of options) {
+                                        if (opt.value || opt.innerText) {
+                                            opcoes.push({
+                                                texto: opt.innerText || opt.value,
+                                                valor: opt.value || opt.innerText
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Procurar por divs que possam conter as opções
+                            if (opcoes.length === 0) {
+                                const allDivs = document.querySelectorAll('div');
+                                for (const div of allDivs) {
+                                    const texto = div.innerText ? div.innerText.trim() : '';
+                                    // Verificar se parece uma competência (MM/YYYY)
+                                    if (/^\d{2}\/\d{4}$/.test(texto)) {
+                                        opcoes.push({
+                                            texto: texto,
+                                            valor: texto
+                                        });
+                                    }
+                                }
+                            }
+
+                            return opcoes;
+                        }
+                    """)
+
+                    if opcoes_alternativas and len(opcoes_alternativas) > 0:
+                        self.logger.info(f"✅ Encontradas {len(opcoes_alternativas)} competências (método alternativo):")
+                        for i, opcao in enumerate(opcoes_alternativas, 1):
+                            competencias.append(opcao['texto'])
+                            self.logger.info(f"  {i}. {opcao['texto']}")
+                    else:
+                        self.logger.warning("⚠️  Nenhuma opção encontrada")
+
+            except Exception as e:
+                self.logger.error(f"❌ Erro ao extrair competências: {str(e)}")
+                self.logger.exception("Traceback:")
+                await self._screenshot_erro("erro_extrair_competencias")
+
+            # Salvar competências em arquivo
+            if competencias:
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    competencias_path = os.path.join(self.log_dir, f"competencias_em_aberto_{timestamp}.json")
+
+                    dados = {
+                        "timestamp": timestamp,
+                        "total": len(competencias),
+                        "competencias": competencias
+                    }
+
+                    with open(competencias_path, 'w', encoding='utf-8') as f:
+                        json.dump(dados, f, ensure_ascii=False, indent=2)
+
+                    self.logger.info(f"💾 Competências salvas em: {competencias_path}")
+                except Exception as e:
+                    self.logger.warning(f"Erro ao salvar arquivo: {str(e)}")
+
+                # Tirar screenshot final
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    screenshot_path = os.path.join(self.log_dir, f"competencias_tela_{timestamp}.png")
+                    await self.page.screenshot(path=screenshot_path, full_page=True)
+                    self.logger.info(f"📸 Screenshot salvo: {screenshot_path}")
+                except Exception as e:
+                    self.logger.warning(f"Erro ao tirar screenshot: {str(e)}")
+
+            self.logger.info("")
+            self.logger.info("=" * 70)
+            self.logger.info(f"✅ Total de competências encontradas: {len(competencias)}")
+            self.logger.info("=" * 70)
+
+            return competencias
 
         except Exception as e:
             self.logger.error(f"❌ Erro ao buscar competências: {str(e)}")
