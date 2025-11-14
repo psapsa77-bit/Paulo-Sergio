@@ -1,19 +1,16 @@
 """
 Interface Web Streamlit para o Robô DET
 Autor: Paulo Sergio
-Versão: 1.0.0
+Versão: 2.0.0
 """
 
-import streamlit as st
-import asyncio
-import json
-from pathlib import Path
-from datetime import datetime
 import sys
 import platform
 
-# Fix para Python 3.13+ no Windows
+# IMPORTANTE: Fix para Python 3.13+ no Windows
+# Deve estar ANTES de qualquer import de asyncio ou outras libs async!
 if sys.platform == 'win32' and sys.version_info >= (3, 8):
+    import asyncio
     try:
         # Para Python 3.13+, usar WindowsSelectorEventLoopPolicy
         if sys.version_info >= (3, 13):
@@ -21,8 +18,14 @@ if sys.platform == 'win32' and sys.version_info >= (3, 8):
         # Para Python 3.8-3.12, usar WindowsProactorEventLoopPolicy se disponível
         elif hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    except Exception:
-        pass  # Ignorar erros de configuração do event loop
+    except Exception as e:
+        print(f"Aviso: Não foi possível configurar event loop policy: {e}")
+
+import streamlit as st
+import asyncio
+import json
+from pathlib import Path
+from datetime import datetime
 
 # Adicionar diretório pai ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -48,42 +51,6 @@ def adicionar_log(mensagem: str):
     st.session_state.logs.append(f"[{timestamp}] {mensagem}")
 
 
-def limpar_logs():
-    """Limpa os logs da sessão"""
-    st.session_state.logs = []
-
-
-def carregar_empresas_json():
-    """Carrega lista de empresas do arquivo JSON"""
-    if config.DADOS_EMPRESAS.exists():
-        try:
-            with open(config.DADOS_EMPRESAS, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            st.error(f"Erro ao carregar empresas: {str(e)}")
-            return []
-    return []
-
-
-def salvar_empresas_json(empresas: list):
-    """Salva lista de empresas em arquivo JSON"""
-    try:
-        with open(config.DADOS_EMPRESAS, 'w', encoding='utf-8') as f:
-            json.dump(empresas, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        st.error(f"Erro ao salvar empresas: {str(e)}")
-        return False
-
-
-def formatar_cnpj(cnpj: str) -> str:
-    """Formata CNPJ com pontuação"""
-    cnpj = ''.join(filter(str.isdigit, cnpj))
-    if len(cnpj) == 14:
-        return f"{cnpj[:2]}.{cnpj[2:5]}.{cnpj[5:8]}/{cnpj[8:12]}-{cnpj[12:]}"
-    return cnpj
-
-
 def processar_texto_cnpjs(texto: str) -> list:
     """
     Processa texto com CNPJs e retorna lista de dicionários
@@ -92,527 +59,307 @@ def processar_texto_cnpjs(texto: str) -> list:
     - CNPJ (um por linha)
     - CNPJ,Nome da Empresa
     - CNPJ;Nome da Empresa
-
-    Args:
-        texto: Texto com CNPJs
-
-    Returns:
-        Lista de dicionários com 'cnpj' e 'nome'
     """
     empresas = []
     linhas = texto.strip().split('\n')
 
     for idx, linha in enumerate(linhas, 1):
         linha = linha.strip()
-        if not linha or linha.startswith('#'):  # Ignora linhas vazias e comentários
+        if not linha or linha.startswith('#'):
             continue
 
         # Tentar separar CNPJ e nome
-        partes = None
+        cnpj = ""
+        nome = f"Empresa {idx}"
+
+        # Verificar se tem vírgula ou ponto-e-vírgula
         if ',' in linha:
             partes = linha.split(',', 1)
+            cnpj = partes[0].strip()
+            if len(partes) > 1:
+                nome = partes[1].strip()
         elif ';' in linha:
             partes = linha.split(';', 1)
-        elif '\t' in linha:
-            partes = linha.split('\t', 1)
-
-        if partes and len(partes) >= 2:
-            cnpj_raw = partes[0].strip()
-            nome = partes[1].strip()
+            cnpj = partes[0].strip()
+            if len(partes) > 1:
+                nome = partes[1].strip()
         else:
-            cnpj_raw = linha.strip()
-            nome = f"Empresa {idx}"
+            cnpj = linha
 
         # Limpar CNPJ (remover tudo que não é número)
-        cnpj = ''.join(filter(str.isdigit, cnpj_raw))
+        cnpj_limpo = ''.join(c for c in cnpj if c.isdigit())
 
-        # Validar CNPJ (14 dígitos)
-        if len(cnpj) == 14:
+        if len(cnpj_limpo) == 14:
             empresas.append({
-                "cnpj": cnpj,
+                "cnpj": cnpj_limpo,
                 "nome": nome
             })
+        elif cnpj_limpo:  # Se tem números mas não são 14 dígitos
+            st.warning(f"⚠️ CNPJ inválido na linha {idx}: {cnpj} (deve ter 14 dígitos)")
 
     return empresas
 
 
-def processar_arquivo_upload(arquivo) -> list:
-    """
-    Processa arquivo TXT ou JSON com CNPJs
-
-    Args:
-        arquivo: Arquivo uploaded pelo Streamlit
-
-    Returns:
-        Lista de dicionários com 'cnpj' e 'nome'
-    """
+def processar_arquivo_cnpjs(uploaded_file) -> list:
+    """Processa arquivo com CNPJs (TXT ou JSON)"""
     try:
-        conteudo = arquivo.read().decode('utf-8')
+        conteudo = uploaded_file.read().decode('utf-8')
 
         # Se for JSON
-        if arquivo.name.endswith('.json'):
-            empresas = json.loads(conteudo)
-            if isinstance(empresas, list):
+        if uploaded_file.name.endswith('.json'):
+            dados = json.loads(conteudo)
+            if isinstance(dados, list):
+                empresas = []
+                for item in dados:
+                    if isinstance(item, dict) and 'cnpj' in item:
+                        cnpj_limpo = ''.join(c for c in str(item['cnpj']) if c.isdigit())
+                        if len(cnpj_limpo) == 14:
+                            empresas.append({
+                                "cnpj": cnpj_limpo,
+                                "nome": item.get('nome', f'Empresa {len(empresas)+1}')
+                            })
                 return empresas
 
-        # Se for TXT ou outro
+        # Se for TXT, processar como texto
         return processar_texto_cnpjs(conteudo)
 
     except Exception as e:
-        st.error(f"Erro ao processar arquivo: {str(e)}")
+        st.error(f"❌ Erro ao processar arquivo: {str(e)}")
         return []
 
 
-def main():
-    # Inicializar session_state
-    if "mensagens_data" not in st.session_state:
-        st.session_state.mensagens_data = None
-    if "resultados" not in st.session_state:
-        st.session_state.resultados = None
-    if "logs" not in st.session_state:
-        st.session_state.logs = []
-    if "lista_cnpj_texto" not in st.session_state:
-        st.session_state.lista_cnpj_texto = ""
-    if "empresas_processadas" not in st.session_state:
-        st.session_state.empresas_processadas = []
+async def executar_robot(empresas: list):
+    """Executa o robô para processar empresas"""
+    try:
+        adicionar_log("Iniciando robô...")
 
-    # Título principal
+        # Criar instância do robô
+        robot = RobotDET(headless=False)
+
+        # Processar empresas
+        sucesso = await robot.processar_empresas(empresas)
+
+        if sucesso:
+            adicionar_log("✅ Processamento concluído!")
+            return robot.dados_resultado
+        else:
+            adicionar_log("❌ Erro no processamento")
+            return None
+
+    except Exception as e:
+        adicionar_log(f"❌ Erro: {str(e)}")
+        st.error(f"Erro ao executar robô: {str(e)}")
+        return None
+
+
+def main():
+    """Função principal da interface"""
+
+    # Título
     st.title("🤖 Robô DET - Verificador de Mensagens")
-    st.markdown("**Automação para verificar mensagens não lidas no Portal DET**")
+    st.markdown("**Portal:** https://det.sit.trabalho.gov.br/")
+    st.markdown("**Versão:** 2.0.0")
+
     st.divider()
 
-    # Sidebar
+    # Sidebar com informações
     with st.sidebar:
-        st.header("⚙️ Configurações")
+        st.header("ℹ️ Informações")
+        st.info("""
+        **Como usar:**
+        1. Digite os CNPJs ou faça upload de arquivo
+        2. Clique em "Processar Empresas"
+        3. Selecione seu certificado digital
+        4. Aguarde os resultados
+        """)
 
-        st.subheader("🔐 Portal DET")
-        st.info(f"🌐 {config.DET_URL}")
+        st.header("📋 Formatos Aceitos")
+        st.code("""
+# Apenas CNPJ
+12345678000190
 
-        st.divider()
+# CNPJ com nome
+12345678000190,Minha Empresa
+12345678000190;Minha Empresa
+        """, language="text")
 
-        st.subheader("📁 Diretórios")
-        st.text(f"Logs: {config.LOGS_DIR}")
-        st.text(f"Resultados: {config.RESULTS_DIR}")
+        st.header("📊 Sistema")
+        st.text(f"Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        st.text(f"Sistema: {platform.system()}")
 
-        st.divider()
+    # Área principal
+    tab1, tab2 = st.tabs(["📝 Processar", "📊 Resultados"])
 
-        st.subheader("🛠️ Opções")
-        headless = st.checkbox("Modo Headless", value=False, help="Executar navegador em segundo plano")
-
-        st.divider()
-
-        if st.button("🗑️ Limpar Logs", use_container_width=True):
-            limpar_logs()
-            st.rerun()
-
-    # Tabs principais
-    tab1, tab2, tab3 = st.tabs(["🚀 Processar", "📊 Resultados", "📝 Logs"])
-
-    # TAB 1: Processar
     with tab1:
-        st.header("🚀 Processar Verificação de Mensagens")
+        st.header("📝 Adicionar Empresas")
 
-        # Opções de entrada
-        st.subheader("📋 Informar Empresas")
-
-        metodo_input = st.radio(
-            "Escolha o método de entrada:",
-            ["✍️ Digitar CNPJs", "📁 Upload de Arquivo"],
+        # Método de entrada
+        metodo = st.radio(
+            "Escolha o método:",
+            ["Digitar CNPJs", "Upload de Arquivo"],
             horizontal=True
         )
 
-        st.divider()
+        empresas = []
 
-        empresas_para_processar = []
-
-        if metodo_input == "✍️ Digitar CNPJs":
-            st.markdown("""
-            **Formatos aceitos:**
-            - `CNPJ` (um por linha) - Ex: `12345678000199`
-            - `CNPJ,Nome da Empresa` - Ex: `12345678000199,Minha Empresa Ltda`
-            - `CNPJ;Nome da Empresa` - Ex: `12345678000199;Minha Empresa Ltda`
-
-            💡 **Dica:** Você pode usar CNPJ com ou sem formatação (pontos e traços)
-            """)
-
-            lista_cnpj_texto = st.text_area(
-                "Digite os CNPJs (um por linha):",
-                value=st.session_state.lista_cnpj_texto,
+        if metodo == "Digitar CNPJs":
+            st.markdown("**Digite os CNPJs (um por linha):**")
+            texto_cnpjs = st.text_area(
+                "CNPJs",
                 height=200,
-                placeholder="12345678000199,Empresa Exemplo 1\n98765432000188,Empresa Exemplo 2\n11223344000155",
-                help="Digite um CNPJ por linha. Opcionalmente, adicione vírgula e o nome da empresa"
+                placeholder="12345678000190\n98765432000188\nou\n12345678000190,Nome da Empresa",
+                label_visibility="collapsed"
             )
 
-            if lista_cnpj_texto.strip():
-                empresas_para_processar = processar_texto_cnpjs(lista_cnpj_texto)
-                st.session_state.lista_cnpj_texto = lista_cnpj_texto
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("👁️ Visualizar CNPJs"):
+                    if texto_cnpjs.strip():
+                        empresas = processar_texto_cnpjs(texto_cnpjs)
+                        if empresas:
+                            st.success(f"✅ {len(empresas)} empresa(s) encontrada(s)")
+                            for emp in empresas:
+                                st.write(f"- {emp['nome']}: {emp['cnpj']}")
+                        else:
+                            st.warning("⚠️ Nenhum CNPJ válido encontrado")
+                    else:
+                        st.warning("⚠️ Digite pelo menos um CNPJ")
 
-                if empresas_para_processar:
-                    st.success(f"✅ {len(empresas_para_processar)} empresa(s) identificada(s)")
-
-                    # Preview das empresas
-                    with st.expander("👁️ Visualizar empresas identificadas"):
-                        for emp in empresas_para_processar:
-                            st.text(f"• {emp['nome']} - {formatar_cnpj(emp['cnpj'])}")
-                else:
-                    st.warning("⚠️ Nenhum CNPJ válido encontrado")
-
-        else:  # Upload de arquivo
-            st.markdown("""
-            **Formatos aceitos:**
-            - **TXT**: Um CNPJ por linha (com ou sem nome)
-            - **JSON**: Array de objetos `[{"cnpj": "...", "nome": "..."}]`
-            """)
-
+        else:  # Upload de Arquivo
+            st.markdown("**Faça upload de um arquivo TXT ou JSON:**")
             uploaded_file = st.file_uploader(
-                "Selecione o arquivo com os CNPJs:",
+                "Escolha um arquivo",
                 type=['txt', 'json'],
-                help="Arquivo TXT ou JSON com lista de CNPJs"
+                label_visibility="collapsed"
             )
 
             if uploaded_file:
-                empresas_para_processar = processar_arquivo_upload(uploaded_file)
-
-                if empresas_para_processar:
-                    st.success(f"✅ {len(empresas_para_processar)} empresa(s) carregada(s) do arquivo")
-
-                    # Preview das empresas
-                    with st.expander("👁️ Visualizar empresas do arquivo"):
-                        for emp in empresas_para_processar:
-                            st.text(f"• {emp['nome']} - {formatar_cnpj(emp['cnpj'])}")
+                empresas = processar_arquivo_cnpjs(uploaded_file)
+                if empresas:
+                    st.success(f"✅ {len(empresas)} empresa(s) carregada(s)")
+                    with st.expander("Ver empresas carregadas"):
+                        for emp in empresas:
+                            st.write(f"- {emp['nome']}: {emp['cnpj']}")
                 else:
-                    st.warning("⚠️ Nenhum CNPJ válido encontrado no arquivo")
+                    st.error("❌ Nenhuma empresa válida encontrada no arquivo")
 
-            # Exemplo de arquivo para download
-            st.markdown("---")
-            st.markdown("**📥 Baixar arquivo de exemplo:**")
-
+            # Botões para download de exemplos
+            st.markdown("**📥 Baixar exemplos:**")
             col1, col2 = st.columns(2)
 
             with col1:
-                exemplo_txt = """# Exemplo de arquivo TXT para Robô DET
-# Formato: CNPJ,Nome da Empresa (um por linha)
-
-12345678000199,Empresa Exemplo 1 Ltda
-98765432000188,Empresa Exemplo 2 S/A
-11223344000155,Empresa Exemplo 3
-
-# Você também pode usar apenas o CNPJ:
-44556677000199
-"""
+                exemplo_txt = "12345678000190,Empresa Exemplo 1\n98765432000188,Empresa Exemplo 2"
                 st.download_button(
-                    label="📄 Exemplo TXT",
-                    data=exemplo_txt,
-                    file_name="empresas_exemplo.txt",
-                    mime="text/plain",
-                    use_container_width=True
+                    "📄 Exemplo TXT",
+                    exemplo_txt,
+                    "exemplo_cnpjs.txt",
+                    "text/plain"
                 )
 
             with col2:
                 exemplo_json = json.dumps([
-                    {"cnpj": "12345678000199", "nome": "Empresa Exemplo 1 Ltda"},
-                    {"cnpj": "98765432000188", "nome": "Empresa Exemplo 2 S/A"},
-                    {"cnpj": "11223344000155", "nome": "Empresa Exemplo 3"}
-                ], ensure_ascii=False, indent=2)
-
+                    {"cnpj": "12345678000190", "nome": "Empresa Exemplo 1"},
+                    {"cnpj": "98765432000188", "nome": "Empresa Exemplo 2"}
+                ], indent=2, ensure_ascii=False)
                 st.download_button(
-                    label="📄 Exemplo JSON",
-                    data=exemplo_json,
-                    file_name="empresas_exemplo.json",
-                    mime="application/json",
-                    use_container_width=True
+                    "📄 Exemplo JSON",
+                    exemplo_json,
+                    "exemplo_cnpjs.json",
+                    "application/json"
                 )
 
         st.divider()
 
-        # Botão de processar
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # Botão processar
+        if st.button("🚀 Processar Empresas", type="primary", use_container_width=True):
+            # Obter empresas do método escolhido
+            if metodo == "Digitar CNPJs" and texto_cnpjs.strip():
+                empresas = processar_texto_cnpjs(texto_cnpjs)
 
-        with col2:
-            if empresas_para_processar:
-                if st.button("🚀 INICIAR VERIFICAÇÃO", type="primary", use_container_width=True, key="btn_processar"):
-                    limpar_logs()
-                    adicionar_log("🤖 Iniciando Robô DET...")
-                    adicionar_log(f"📋 {len(empresas_para_processar)} empresa(s) serão processadas")
-
-                    # Salvar empresas processadas
-                    st.session_state.empresas_processadas = empresas_para_processar
-
-                    with st.spinner("🔄 Processando... Isso pode levar alguns minutos..."):
-                        try:
-                            robo = RobotDET(headless=headless)
-
-                            # Executar processamento
-                            sucesso = asyncio.run(robo.processar_empresas(empresas_para_processar))
-
-                            if sucesso:
-                                adicionar_log("✅ Processamento concluído com sucesso!")
-                                st.success("✅ Verificação concluída!")
-
-                                # Salvar dados na sessão
-                                st.session_state.mensagens_data = robo.dados_resultado
-                                adicionar_log(f"✅ {len(robo.mensagens_encontradas)} mensagem(ns) não lida(s) encontrada(s)")
-
-                                # Buscar arquivo HTML de resultado mais recente
-                                arquivos_html = sorted(
-                                    config.RESULTS_DIR.glob("mensagens_det_*.html"),
-                                    key=lambda x: x.stat().st_mtime,
-                                    reverse=True
-                                )
-
-                                if arquivos_html:
-                                    st.session_state.resultados = arquivos_html[0]
-                                    adicionar_log(f"📄 Arquivo HTML gerado: {arquivos_html[0].name}")
-                            else:
-                                adicionar_log("❌ Processamento falhou")
-                                st.error("❌ Processamento falhou. Verifique os logs.")
-
-                        except Exception as e:
-                            adicionar_log(f"❌ Erro: {str(e)}")
-                            st.error(f"❌ Erro ao processar: {str(e)}")
-
-                    st.rerun()
+            if not empresas:
+                st.error("❌ Nenhuma empresa para processar. Adicione CNPJs primeiro!")
             else:
-                st.info("ℹ️ Informe os CNPJs das empresas para iniciar a verificação")
+                st.info(f"🔄 Processando {len(empresas)} empresa(s)...")
 
-        st.divider()
+                # Executar robô
+                with st.spinner("Aguarde... O navegador vai abrir para seleção do certificado"):
+                    resultado = asyncio.run(executar_robot(empresas))
 
-        # Logs em tempo real
-        if st.session_state.logs:
-            st.subheader("📝 Logs da Execução")
-            log_container = st.container(height=300)
-            with log_container:
-                for log in st.session_state.logs:
-                    st.text(log)
+                if resultado:
+                    st.session_state.ultimo_resultado = resultado
+                    st.success("✅ Processamento concluído!")
+                    st.balloons()
 
-    # TAB 2: Resultados
-    with tab2:
-        st.header("📊 Resultados da Verificação")
-
-        # Resumo
-        if st.session_state.mensagens_data:
-            dados = st.session_state.mensagens_data
-
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-                st.metric("🏢 Total de Empresas", dados.get('total_empresas_processadas', 0))
-
-            with col2:
-                st.metric("📬 Com Mensagens", dados.get('empresas_com_mensagens', 0))
-
-            with col3:
-                st.metric("📭 Sem Mensagens", dados.get('empresas_sem_mensagens', 0))
-
-            with col4:
-                st.metric("📧 Total de Mensagens", dados.get('total_mensagens_nao_lidas', 0))
-
-            st.divider()
-
-            # Detalhes por empresa
-            st.subheader("🏢 Detalhes por Empresa")
-
-            for resultado in dados.get('resultados_por_empresa', []):
-                with st.expander(f"📋 {resultado['nome']} - {formatar_cnpj(resultado['cnpj'])}"):
-                    col1, col2 = st.columns([2, 1])
+                    # Mostrar resumo
+                    st.header("📊 Resumo")
+                    col1, col2, col3, col4 = st.columns(4)
 
                     with col1:
-                        st.text(f"Status: {resultado['status']}")
-                        st.text(f"CNPJ: {formatar_cnpj(resultado['cnpj'])}")
-
-                    with col2:
-                        total_msg = resultado.get('total_mensagens', 0)
-                        if total_msg > 0:
-                            st.error(f"⚠️ {total_msg} mensagem(ns) não lida(s)")
-                        else:
-                            st.success("✅ Sem mensagens")
-
-                    # Listar mensagens
-                    if resultado.get('mensagens'):
-                        st.markdown("**📬 Mensagens Não Lidas:**")
-                        for msg in resultado['mensagens']:
-                            st.markdown(f"- 📧 **{msg.get('assunto', 'Sem assunto')}**")
-                            if msg.get('data'):
-                                st.markdown(f"  - 📅 {msg['data']}")
-                            if msg.get('remetente'):
-                                st.markdown(f"  - 👤 {msg['remetente']}")
-                            if msg.get('tem_anexo'):
-                                st.markdown("  - 📎 Anexo")
-
-            # Downloads
-            st.divider()
-            st.subheader("📥 Downloads")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                # Download JSON
-                json_str = json.dumps(dados, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="📥 Baixar JSON",
-                    data=json_str,
-                    file_name=f"mensagens_det_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-
-            with col2:
-                # Download HTML (se existir)
-                arquivos_html = sorted(
-                    config.RESULTS_DIR.glob("mensagens_det_*.html"),
-                    key=lambda x: x.stat().st_mtime,
-                    reverse=True
-                )
-                if arquivos_html:
-                    with open(arquivos_html[0], 'r', encoding='utf-8') as f:
-                        st.download_button(
-                            label="📥 Baixar HTML",
-                            data=f.read(),
-                            file_name=arquivos_html[0].name,
-                            mime="text/html",
-                            use_container_width=True
+                        st.metric(
+                            "Total",
+                            resultado.get('total_empresas_processadas', 0)
                         )
-
-            st.divider()
-
-        # Arquivo HTML gerado (se existir)
-        if st.session_state.resultados and st.session_state.resultados.suffix == '.html':
-            st.success(f"📊 Arquivo HTML gerado: {st.session_state.resultados.name}")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                data_mod = datetime.fromtimestamp(st.session_state.resultados.stat().st_mtime)
-                st.metric("Data", data_mod.strftime("%d/%m/%Y %H:%M"))
-
-            with col2:
-                tamanho = st.session_state.resultados.stat().st_size / 1024
-                st.metric("Tamanho", f"{tamanho:.2f} KB")
-
-            # Preview do HTML
-            try:
-                with open(st.session_state.resultados, 'r', encoding='utf-8') as f:
-                    html_content = f.read()
-
-                st.subheader("Preview do Relatório")
-                st.components.v1.html(html_content, height=800, scrolling=True)
-            except Exception as e:
-                st.warning(f"Não foi possível carregar preview: {str(e)}")
-
-            # Download
-            st.divider()
-
-            with open(st.session_state.resultados, 'r', encoding='utf-8') as f:
-                st.download_button(
-                    label="📥 BAIXAR ARQUIVO HTML",
-                    data=f.read(),
-                    file_name=st.session_state.resultados.name,
-                    mime="text/html",
-                    use_container_width=True
-                )
-
-        # Mensagem quando não há resultados
-        if not st.session_state.mensagens_data and not st.session_state.resultados:
-            st.info("📭 Nenhum resultado disponível ainda. Execute uma verificação na aba '🚀 Processar' para visualizar as mensagens.")
-
-            # Listar resultados anteriores (HTML)
-            arquivos_anteriores_html = sorted(
-                config.RESULTS_DIR.glob("mensagens_det_*.html"),
-                key=lambda x: x.stat().st_mtime,
-                reverse=True
-            )
-
-            if arquivos_anteriores_html:
-                st.subheader("📁 Resultados Anteriores (HTML)")
-
-                for arquivo in arquivos_anteriores_html[:10]:  # Mostrar últimos 10
-                    col1, col2, col3 = st.columns([3, 1, 1])
-
-                    with col1:
-                        st.text(arquivo.name)
-
                     with col2:
-                        data_mod = datetime.fromtimestamp(arquivo.stat().st_mtime)
-                        st.text(data_mod.strftime("%d/%m/%Y %H:%M"))
-
+                        st.metric(
+                            "Com Mensagens",
+                            resultado.get('empresas_com_mensagens', 0)
+                        )
                     with col3:
-                        with open(arquivo, 'r', encoding='utf-8') as f:
-                            st.download_button(
-                                "⬇️",
-                                data=f.read(),
-                                file_name=arquivo.name,
-                                mime="text/html",
-                                key=f"download_{arquivo.name}"
-                            )
-
-    # TAB 3: Logs
-    with tab3:
-        st.header("📝 Logs do Sistema")
-
-        col1, col2 = st.columns([3, 1])
-
-        with col2:
-            if st.button("🔄 Atualizar", use_container_width=True):
-                st.rerun()
-
-            if st.button("🗑️ Limpar", use_container_width=True):
-                limpar_logs()
-                st.rerun()
-
-        # Mostrar logs
-        if st.session_state.logs:
-            log_container = st.container(height=600)
-            with log_container:
-                for log in st.session_state.logs:
-                    st.text(log)
-        else:
-            st.info("📭 Nenhum log disponível")
-
-        st.divider()
-
-        # Arquivos de log
-        st.subheader("📁 Arquivos de Log")
-
-        arquivos_log = sorted(
-            config.LOGS_DIR.glob("det_robot_*.log"),
-            key=lambda x: x.stat().st_mtime,
-            reverse=True
-        )
-
-        if arquivos_log:
-            for arquivo in arquivos_log[:10]:  # Últimos 10
-                col1, col2, col3 = st.columns([3, 1, 1])
-
-                with col1:
-                    st.text(arquivo.name)
-
-                with col2:
-                    data_mod = datetime.fromtimestamp(arquivo.stat().st_mtime)
-                    st.text(data_mod.strftime("%d/%m/%Y %H:%M"))
-
-                with col3:
-                    with open(arquivo, 'r', encoding='utf-8') as f:
-                        st.download_button(
-                            "⬇️",
-                            data=f.read(),
-                            file_name=arquivo.name,
-                            mime="text/plain",
-                            key=f"log_{arquivo.name}"
+                        st.metric(
+                            "Sem Mensagens",
+                            resultado.get('empresas_sem_mensagens', 0)
                         )
-        else:
-            st.info("📭 Nenhum arquivo de log encontrado")
+                    with col4:
+                        st.metric(
+                            "Total Mensagens",
+                            resultado.get('total_mensagens_nao_lidas', 0)
+                        )
 
-    # Footer
-    st.divider()
-    st.markdown(
-        """
-        <div style='text-align: center; color: #666; padding: 20px;'>
-            <p><strong>🤖 Robô DET - Verificador de Mensagens</strong></p>
-            <p>Versão 1.0.0 | Portal: https://det.sit.trabalho.gov.br/</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+                    # Mostrar resultados por empresa
+                    st.header("📋 Resultados por Empresa")
+                    for res in resultado.get('resultados_por_empresa', []):
+                        with st.expander(f"{res['nome']} - {res['cnpj']}"):
+                            if res['sucesso']:
+                                if res['total_mensagens'] > 0:
+                                    st.warning(f"⚠️ {res['total_mensagens']} mensagem(ns) não lida(s)")
+                                    for msg in res['mensagens']:
+                                        st.write(f"**Assunto:** {msg.get('assunto', 'N/A')}")
+                                        st.write(f"**Data:** {msg.get('data', 'N/A')}")
+                                        if msg.get('remetente'):
+                                            st.write(f"**Remetente:** {msg['remetente']}")
+                                        if msg.get('tem_anexo'):
+                                            st.write("📎 Com anexo")
+                                        st.divider()
+                                else:
+                                    st.success("✅ Nenhuma mensagem não lida")
+                            else:
+                                st.error(f"❌ Erro: {res.get('erro', 'Desconhecido')}")
+
+                    # Informar localização dos arquivos
+                    st.info("""
+                    📂 **Relatórios salvos em:** `det_robot/resultados/`
+                    - Abra o arquivo HTML para visualizar relatório completo
+                    - Arquivo JSON para processamento de dados
+                    """)
+
+    with tab2:
+        st.header("📊 Último Resultado")
+
+        if "ultimo_resultado" in st.session_state:
+            resultado = st.session_state.ultimo_resultado
+
+            st.json(resultado)
+
+            # Botão para baixar JSON
+            json_str = json.dumps(resultado, indent=2, ensure_ascii=False)
+            st.download_button(
+                "💾 Baixar Resultado (JSON)",
+                json_str,
+                f"resultado_det_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                "application/json"
+            )
+        else:
+            st.info("ℹ️ Nenhum resultado disponível ainda. Processe empresas primeiro.")
 
 
 if __name__ == "__main__":
