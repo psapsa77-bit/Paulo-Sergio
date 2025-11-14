@@ -1,329 +1,342 @@
-# 🚀 Guia Rápido - Robô DET
+# 🚀 Guia Rápido - Robô DET v2.0
 
-## ⚡ Início Rápido (5 minutos)
+> **Novo!** Versão 2.0 com suporte aprimorado para certificados digitais
 
-### 1️⃣ Instalação
+## ⚡ Início Rápido (3 passos)
 
-**Windows:**
-```
-Execute: INSTALAR_DET.bat
-```
-
-**Linux/Mac:**
-```bash
-./instalar_det.sh
-```
-
-### 2️⃣ Executar
+### 1️⃣ Instalação (apenas uma vez)
 
 **Windows:**
 ```
-Execute: ABRIR_DET.bat
+Clique duas vezes em: INSTALAR_DET.bat
 ```
 
-**Linux/Mac:**
-```bash
-./abrir_det.sh
+Aguarde 2-5 minutos e pronto!
+
+### 2️⃣ Executar o Robô
+
+**Windows:**
+```
+Clique duas vezes em: ABRIR_DET.bat
 ```
 
-### 3️⃣ Acessar
+Uma página web abrirá automaticamente em seu navegador.
 
-Abra no navegador:
+### 3️⃣ Usar
+
+1. Digite os CNPJs das empresas
+2. Clique em "Processar Empresas"
+3. Selecione seu certificado digital
+4. Aguarde os resultados!
+
+## 📝 Passo a Passo Detalhado
+
+### Passo 1: Adicionar CNPJs das Empresas
+
+Na interface web, você tem **duas opções**:
+
+#### Opção A: Digitar CNPJs
+
+Digite os CNPJs na caixa de texto, um por linha:
+
 ```
-http://localhost:8503
+12345678000190
+98765432000188
+11223344000155
 ```
 
-## 📝 Passo a Passo Completo
+Você também pode incluir o nome da empresa:
 
-### Passo 1: Cadastrar Empresas
-
-1. Clique na aba **"🏢 Empresas"**
-2. Preencha:
-   - **Nome da Empresa**: Digite o nome
-   - **CNPJ**: Digite apenas números (14 dígitos)
-3. Clique em **"➕ Adicionar"**
-4. Repita para cada empresa
-
-**Exemplo:**
 ```
-Nome: Minha Empresa Ltda
-CNPJ: 12345678000199
+12345678000190,Minha Empresa Ltda
+98765432000188,Outra Empresa SA
+11223344000155,Terceira Empresa ME
 ```
 
-### Passo 2: Processar Verificação
+#### Opção B: Enviar Arquivo
 
-1. Clique na aba **"🚀 Processar"**
-2. Verifique a lista de empresas cadastradas
-3. Clique em **"🚀 INICIAR VERIFICAÇÃO"**
-4. **Aguarde** a janela do navegador abrir
-5. **Selecione** seu certificado digital quando solicitado
-6. O robô fará o resto automaticamente!
+Clique em "Browse files" e selecione um arquivo `.txt` ou `.json`:
 
-### Passo 3: Ver Resultados
+**Arquivo TXT (exemplos.txt):**
+```
+12345678000190
+98765432000188
+11223344000155
+```
 
-1. Clique na aba **"📊 Resultados"**
-2. Visualize:
-   - Total de empresas processadas
-   - Empresas com mensagens
-   - Empresas sem mensagens
-   - Total de mensagens não lidas
-3. **Expanda** cada empresa para ver detalhes
-4. **Baixe** os relatórios (HTML ou JSON)
+Ou com nomes:
+```
+12345678000190,Minha Empresa Ltda
+98765432000188,Outra Empresa SA
+11223344000155,Terceira Empresa ME
+```
 
-## 📊 Interpretando os Resultados
-
-### Status da Empresa
-
-- ✅ **Verde**: Sem mensagens não lidas
-- ⚠️ **Amarelo**: Tem mensagens não lidas (ATENÇÃO!)
-- ❌ **Vermelho**: Erro ao processar
-
-### Detalhes da Mensagem
-
-Para cada mensagem não lida você verá:
-- 📧 **Assunto**: Título da mensagem
-- 📅 **Data**: Quando foi enviada
-- 👤 **Remetente**: Quem enviou
-- 📎 **Anexo**: Se tem arquivo anexo
-
-## 💡 Dicas Importantes
-
-### ✅ Antes de Começar
-
-- [ ] Certifique-se de ter certificado digital válido
-- [ ] Verifique sua conexão com internet
-- [ ] Feche outras instâncias do navegador
-- [ ] Cadastre todas as empresas primeiro
-
-### 🔐 Durante o Login
-
-- **Aguarde** a janela do certificado aparecer
-- **Selecione** o certificado correto
-- **Digite** o PIN se solicitado
-- **Não feche** o navegador manualmente
-
-### 📬 Verificando Mensagens
-
-- O robô verifica **automaticamente** cada empresa
-- Você pode ver o progresso nos **logs**
-- O processo pode levar alguns minutos
-- **Não interrompa** durante a execução
-
-### 💾 Salvando Resultados
-
-**Formatos disponíveis:**
-
-1. **HTML** - Para visualizar e imprimir
-   - Design bonito e profissional
-   - Pronto para apresentações
-   - Fácil de compartilhar
-
-2. **JSON** - Para processar dados
-   - Formato estruturado
-   - Fácil de integrar com outros sistemas
-   - Contém todos os detalhes
-
-## 🛠️ Gerenciar Empresas
-
-### Adicionar Empresa
-
-1. Aba **"🏢 Empresas"**
-2. Preencher formulário
-3. Clicar em **"➕ Adicionar"**
-
-### Remover Empresa
-
-1. Aba **"🏢 Empresas"**
-2. Localizar a empresa
-3. Clicar no botão **"🗑️"**
-
-### Importar Lista
-
-1. Aba **"🏢 Empresas"**
-2. Seção **"Importar/Exportar"**
-3. Clicar em **"📤 Importar Empresas (JSON)"**
-4. Selecionar arquivo JSON
-
-**Formato do arquivo:**
+**Arquivo JSON (empresas.json):**
 ```json
 [
-  {
-    "nome": "Empresa 1",
-    "cnpj": "12345678000199"
-  },
-  {
-    "nome": "Empresa 2",
-    "cnpj": "98765432000188"
-  }
+  {"cnpj": "12345678000190", "nome": "Minha Empresa Ltda"},
+  {"cnpj": "98765432000188", "nome": "Outra Empresa SA"}
 ]
 ```
 
-### Exportar Lista
+### Passo 2: Processar
 
-1. Aba **"🏢 Empresas"**
-2. Seção **"Importar/Exportar"**
-3. Clicar em **"📥 Exportar Empresas (JSON)"**
+1. Clique no botão **"🚀 Processar Empresas"**
+2. Uma janela do navegador (Chrome ou Edge) abrirá
+3. **IMPORTANTE:** Quando aparecer a janela de seleção, escolha seu certificado digital
+4. Digite o PIN do certificado se solicitado
+5. Aguarde enquanto o robô:
+   - Faz login com o certificado
+   - Acessa cada empresa
+   - Verifica mensagens não lidas
+   - Gera os relatórios
 
-## 🔍 Personalizar para seu Portal
+### Passo 3: Ver Resultados
 
-O portal DET pode ter estrutura diferente. Para ajustar:
+#### Na Interface Web
 
-### 1. Identificar Seletores
+Os resultados aparecem em tempo real na interface:
+- ✅ Empresas processadas com sucesso
+- ⚠️ Empresas com mensagens não lidas
+- ❌ Erros (se houver)
 
-1. Abra o portal no navegador
-2. Pressione **F12** (ferramentas de desenvolvedor)
-3. Clique no ícone de **inspetor** (seta)
-4. Clique no elemento que deseja capturar
-5. No painel, clique direito → **Copy** → **Copy selector**
+#### Relatórios Salvos
 
-### 2. Atualizar Config
+Os relatórios são salvos automaticamente em:
 
-Edite o arquivo: `det_robot/config.py`
+📂 **det_robot/resultados/**
 
-```python
-SELETORES = {
-    "btn_certificado": "seu_seletor_aqui",
-    "menu_mensagens": "seu_seletor_aqui",
-    "mensagens_nao_lidas": "seu_seletor_aqui",
-    # ... etc
-}
+Você encontrará:
+- **HTML**: `mensagens_det_AAAAMMDD_HHMMSS.html` (relatório visual bonito)
+- **JSON**: `mensagens_det_AAAAMMDD_HHMMSS.json` (dados em formato estruturado)
+
+Clique duas vezes no arquivo HTML para abrir um relatório completo com:
+- Resumo geral
+- Detalhes por empresa
+- Lista de mensagens não lidas
+- Informações de data, remetente e anexos
+
+## 🎯 Exemplos de Uso
+
+### Exemplo 1: Verificar 3 empresas
+
+```
+Na caixa de texto, digite:
+
+12345678000190,Empresa A
+98765432000188,Empresa B
+11223344000155,Empresa C
+
+Clique em "Processar Empresas"
 ```
 
-### 3. Testar
+### Exemplo 2: Upload de arquivo
 
-Execute novamente e verifique se funciona!
+```
+Crie um arquivo empresas.txt:
 
-## ❓ Perguntas Frequentes
+12345678000190
+98765432000188
+11223344000155
 
-### O robô armazena minhas senhas?
-
-❌ **NÃO!** O robô:
-- Usa apenas o certificado digital do sistema
-- Não armazena senhas
-- Não envia dados para internet
-- Tudo fica no seu computador
-
-### Posso processar várias empresas de uma vez?
-
-✅ **SIM!** Você pode:
-- Cadastrar quantas empresas quiser
-- Processar todas de uma vez
-- O robô faz automaticamente
-
-### Preciso estar presente durante o processo?
-
-⚠️ **PARCIALMENTE**:
-- Você precisa selecionar o certificado no início
-- Depois o robô trabalha sozinho
-- Você pode acompanhar pelos logs
-
-### Com que frequência devo verificar?
-
-📅 **Sugestão**:
-- Diariamente: Para empresas ativas
-- Semanalmente: Para empresas com menos movimento
-- Configure conforme sua necessidade
-
-### Os relatórios ficam salvos?
-
-✅ **SIM!**
-- Todos os relatórios ficam em `det_robot/results/`
-- Os logs ficam em `det_robot/logs/`
-- Organizados por data e hora
-
-### Posso usar em múltiplos computadores?
-
-✅ **SIM!**
-- Copie a pasta `det_robot` para outro PC
-- Instale as dependências
-- Configure o certificado digital
-- Pronto!
-
-## 🐛 Resolução Rápida de Problemas
-
-### Problema: Erro ao instalar
-
-**Solução:**
-```bash
-# Verificar Python
-python --version
-
-# Se não tiver, instale:
-# https://www.python.org/downloads/
+Clique em "Browse files"
+Selecione o arquivo
+Clique em "Processar Empresas"
 ```
 
-### Problema: Certificado não aparece
+## ⚙️ Recursos Avançados
 
-**Solução:**
-- Verifique se o certificado está instalado
-- Teste o certificado em outro site
-- Reinicie o computador
+### Formatos de Entrada Aceitos
 
-### Problema: Não encontra mensagens
+O robô aceita vários formatos:
 
-**Solução:**
-- Verifique se tem mensagens no portal manualmente
-- Pode ser necessário ajustar os seletores
-- Consulte a seção "Personalizar para seu Portal"
+```
+# Apenas CNPJ
+12345678000190
 
-### Problema: Processo trava
+# CNPJ com nome (vírgula)
+12345678000190,Minha Empresa
 
-**Solução:**
-- Aumente os timeouts em `config.py`
-- Verifique sua internet
-- Tente novamente
+# CNPJ com nome (ponto e vírgula)
+12345678000190;Minha Empresa
 
-### Problema: Erro de permissão
+# Linhas vazias e comentários são ignorados
+# Este é um comentário
+12345678000190
 
-**Windows:**
-```bash
-# Execute como Administrador
+98765432000188
 ```
 
-**Linux/Mac:**
-```bash
-# Ajuste permissões
-chmod +x *.sh
-```
+### Visualização de Empresas
 
-## 📞 Precisa de Ajuda?
+Antes de processar, você pode clicar em **"👁️ Visualizar CNPJs"** para ver como o robô interpretou sua entrada.
 
-1. ✅ Leia este guia completo
-2. ✅ Verifique os logs em `det_robot/logs/`
-3. ✅ Consulte o README em `det_robot/README.md`
-4. ✅ Teste com uma empresa primeiro
-5. ✅ Verifique se o portal mudou sua estrutura
+### Download de Exemplos
 
-## 🎯 Checklist de Uso
+Na interface, você pode baixar:
+- **Exemplo TXT**: Arquivo de exemplo com CNPJs
+- **Exemplo JSON**: Arquivo JSON estruturado
 
-Antes de cada execução:
+## 🔧 Configurações
 
-- [ ] Certificado digital válido e instalado
-- [ ] Internet funcionando
-- [ ] Empresas cadastradas
-- [ ] Navegador fechado (outras instâncias)
-- [ ] Espaço em disco suficiente
+### Portal DET
 
-Durante a execução:
+O robô acessa automaticamente:
+- URL: https://det.sit.trabalho.gov.br/
 
-- [ ] Selecionou o certificado correto
-- [ ] Aguardando sem interromper
-- [ ] Acompanhando os logs
-- [ ] Sem fechar o navegador
+### Navegadores Suportados
 
-Após a execução:
+**Melhor compatibilidade:**
+- ✅ Google Chrome (recomendado)
+- ✅ Microsoft Edge (recomendado)
 
-- [ ] Verificou os resultados
-- [ ] Baixou os relatórios
-- [ ] Verificou mensagens importantes
-- [ ] Arquivou os documentos
+**Suporte limitado:**
+- ⚠️ Chromium (certificados podem não funcionar)
+
+O robô tenta automaticamente nesta ordem: Chrome → Edge → Chromium
+
+### Logs do Sistema
+
+Para debug e análise, os logs são salvos em:
+
+📋 **det_robot/logs/**
+
+Formato: `det_robot_AAAAMMDD_HHMMSS.log`
+
+## ❓ Solução de Problemas
+
+### Navegador não abre
+
+**Problema:** O robô não consegue abrir o navegador
+
+**Soluções:**
+1. Execute `INSTALAR_DET.bat` novamente
+2. Instale Google Chrome ou Microsoft Edge
+3. Verifique os logs em `det_robot/logs/`
+
+### Certificado não aparece
+
+**Problema:** A janela de seleção de certificado não aparece
+
+**Soluções:**
+1. Verifique se o certificado está instalado no Windows
+2. Use Chrome ou Edge (não Chromium)
+3. Certifique-se que o certificado está válido
+4. Feche outros navegadores abertos
+
+### Erro de Python
+
+**Problema:** "Python não encontrado"
+
+**Solução:**
+1. Instale Python de https://www.python.org/downloads/
+2. **IMPORTANTE:** Marque "Add Python to PATH" ao instalar
+3. Feche e abra o terminal novamente
+4. Execute `INSTALAR_DET.bat` novamente
+
+### CNPJs não reconhecidos
+
+**Problema:** CNPJs não são lidos corretamente
+
+**Soluções:**
+1. Use apenas números (sem pontos, traços ou barras)
+2. Certifique-se que tem 14 dígitos
+3. Use uma linha por CNPJ
+4. Evite espaços extras
+
+### Mensagens não encontradas
+
+**Problema:** O robô não encontra mensagens que existem
+
+**Soluções:**
+1. O portal DET pode ter mudado a estrutura
+2. Verifique se você está logado corretamente
+3. Tente manualmente no portal para confirmar
+4. Veja os logs para detalhes do que aconteceu
+
+## 💡 Dicas
+
+### Para melhor desempenho:
+
+1. **Certificado sempre pronto**: Tenha seu certificado e PIN em mãos
+2. **Chrome ou Edge**: Use um destes navegadores instalados
+3. **Internet estável**: Conexão estável evita timeouts
+4. **Não interrompa**: Deixe o robô trabalhar até o fim
+5. **Feche outras guias**: Evite muitas abas abertas durante a execução
+
+### Para organização:
+
+1. **Nomeie as empresas**: Use o formato `CNPJ,Nome` para identificar melhor
+2. **Use arquivos**: Crie arquivos TXT com suas empresas favoritas
+3. **Salve relatórios**: Os HTML são ótimos para compartilhar
+4. **Verifique logs**: Em caso de dúvida, confira os logs
+
+## 📊 Interpretando os Relatórios
+
+### Relatório HTML
+
+O relatório HTML mostra:
+
+**Resumo:**
+- 🏢 Total de empresas processadas
+- 📬 Empresas com mensagens
+- 📭 Empresas sem mensagens
+- 📧 Total de mensagens encontradas
+
+**Detalhes por Empresa:**
+- Nome e CNPJ formatado
+- Status do processamento
+- Lista de mensagens não lidas com:
+  - 📧 Assunto
+  - 📅 Data
+  - 👤 Remetente
+  - 📎 Indicador de anexo
+
+### Relatório JSON
+
+O JSON contém os mesmos dados em formato estruturado, útil para:
+- Integração com outros sistemas
+- Análise automatizada
+- Importação em planilhas
+
+## 🔐 Segurança
+
+### Certificados Digitais
+
+- O robô **não armazena** informações do certificado
+- O PIN do certificado **não é salvo**
+- Você precisa selecionar o certificado **a cada execução**
+
+### Dados das Empresas
+
+- CNPJs são processados localmente
+- Nenhum dado é enviado para servidores externos
+- Relatórios ficam apenas no seu computador
+
+### Portal DET
+
+- O robô acessa o portal oficial do governo
+- Usa sua autenticação legítima via certificado
+- Não há bypass de segurança
+
+## 📞 Suporte
+
+Se continuar com problemas:
+
+1. Leia este guia novamente com atenção
+2. Confira `COMECE_AQUI.txt` na pasta raiz
+3. Verifique os logs em `det_robot/logs/`
+4. Execute `INSTALAR_DET.bat` novamente (resolve 90% dos problemas)
 
 ## 🎉 Pronto!
 
-Agora você está pronto para usar o **Robô DET**!
+Agora você já sabe usar o Robô DET!
 
-**Dica final:** Comece com 1 ou 2 empresas para se familiarizar com o processo, depois adicione mais! 🚀
+**Resumindo:**
+1. Execute `INSTALAR_DET.bat` (só uma vez)
+2. Execute `ABRIR_DET.bat` (sempre que precisar)
+3. Digite CNPJs → Processar → Selecione certificado → Veja resultados!
 
 ---
 
-**Precisa de mais ajuda?** Consulte o README completo em `det_robot/README.md`
+**Desenvolvido com ❤️ por Paulo Sergio - Versão 2.0**

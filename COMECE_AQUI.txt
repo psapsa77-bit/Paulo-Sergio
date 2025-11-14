@@ -1,0 +1,184 @@
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║          🤖 ROBÔ DET - VERIFICADOR DE MENSAGENS DO PORTAL 📬          ║
+║                                                                       ║
+║                          GUIA RÁPIDO - v2.0                           ║
+║                                                                       ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════
+  📋 O QUE ESTE ROBÔ FAZ?
+═══════════════════════════════════════════════════════════════════════
+
+Este robô acessa automaticamente o Portal DET usando seu certificado
+digital e verifica se existem mensagens não lidas para suas empresas.
+
+Ele gera um relatório bonito em HTML mostrando todas as mensagens
+encontradas!
+
+
+═══════════════════════════════════════════════════════════════════════
+  🚀 COMEÇANDO - SIGA ESTES 3 PASSOS SIMPLES
+═══════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────┐
+│ PASSO 1: INSTALAR (apenas uma vez)                               │
+└───────────────────────────────────────────────────────────────────┘
+
+   1. Clique duas vezes no arquivo: INSTALAR_DET.bat
+
+   2. Aguarde a instalação (2-5 minutos)
+
+   3. Quando aparecer "INSTALAÇÃO CONCLUÍDA", pode fechar
+
+   ✅ Pronto! Você só precisa fazer isso UMA VEZ!
+
+
+┌───────────────────────────────────────────────────────────────────┐
+│ PASSO 2: USAR O ROBÔ (sempre que precisar)                       │
+└───────────────────────────────────────────────────────────────────┘
+
+   1. Clique duas vezes no arquivo: ABRIR_DET.bat
+
+   2. Uma página vai abrir automaticamente no seu navegador
+
+   3. Digite os CNPJs das empresas (um por linha)
+      Exemplo:
+      12345678000190
+      98765432000188
+
+   4. Clique no botão "Processar Empresas"
+
+   5. Uma janela do Chrome ou Edge vai abrir
+
+   6. IMPORTANTE: Selecione seu certificado digital quando aparecer
+
+   7. Digite o PIN do certificado se solicitado
+
+   8. Aguarde o robô trabalhar (vai mostrar tudo que está fazendo)
+
+
+┌───────────────────────────────────────────────────────────────────┐
+│ PASSO 3: VER OS RESULTADOS                                       │
+└───────────────────────────────────────────────────────────────────┘
+
+   Os relatórios são salvos automaticamente em:
+
+   📂 det_robot\resultados\
+
+   Abra o arquivo HTML mais recente para ver um relatório bonito
+   com todas as mensagens encontradas!
+
+
+═══════════════════════════════════════════════════════════════════════
+  ⚠️ REQUISITOS IMPORTANTES
+═══════════════════════════════════════════════════════════════════════
+
+✓ Python 3.8 ou superior instalado
+  Download: https://www.python.org/downloads/
+  IMPORTANTE: Marque "Add Python to PATH" ao instalar!
+
+✓ Certificado Digital válido instalado no computador
+
+✓ Saber o PIN do seu certificado digital
+
+✓ Conexão com internet
+
+✓ Chrome ou Edge instalado (recomendado para certificados)
+
+
+═══════════════════════════════════════════════════════════════════════
+  💡 DICAS ÚTEIS
+═══════════════════════════════════════════════════════════════════════
+
+• O robô usa Chrome ou Edge porque eles funcionam melhor com
+  certificados digitais
+
+• Se você ver mensagens de "tentando encontrar", é normal! O robô
+  tenta vários métodos para encontrar os elementos da página
+
+• Os logs ficam em: det_robot\logs\ (se precisar ver detalhes)
+
+• Você pode adicionar quantos CNPJs quiser, um por linha
+
+• O robô funciona para múltiplas empresas de uma vez só
+
+
+═══════════════════════════════════════════════════════════════════════
+  ❓ PROBLEMAS COMUNS
+═══════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────┐
+│ Python não encontrado                                             │
+└───────────────────────────────────────────────────────────────────┘
+
+   Solução: Instale o Python de https://www.python.org/downloads/
+   Não esqueça de marcar "Add Python to PATH"!
+
+
+┌───────────────────────────────────────────────────────────────────┐
+│ Navegador não abre                                                │
+└───────────────────────────────────────────────────────────────────┘
+
+   Solução:
+   1. Execute INSTALAR_DET.bat novamente
+   2. Verifique se tem Chrome ou Edge instalado
+   3. Veja os logs em det_robot\logs\
+
+
+┌───────────────────────────────────────────────────────────────────┐
+│ Certificado não aparece                                           │
+└───────────────────────────────────────────────────────────────────┘
+
+   Solução:
+   1. Verifique se o certificado está instalado no Windows
+   2. Use Chrome ou Edge (não Firefox)
+   3. Certifique-se que o certificado está válido
+
+
+═══════════════════════════════════════════════════════════════════════
+  📁 ESTRUTURA DE ARQUIVOS
+═══════════════════════════════════════════════════════════════════════
+
+📂 Raiz do projeto
+   │
+   ├─ INSTALAR_DET.bat ← Clique aqui primeiro (só uma vez)
+   ├─ ABRIR_DET.bat    ← Clique aqui para usar o robô
+   ├─ COMECE_AQUI.txt  ← Você está aqui!
+   │
+   └─ det_robot/
+      ├─ resultados/    ← Seus relatórios ficam aqui
+      └─ logs/          ← Logs do sistema
+
+
+═══════════════════════════════════════════════════════════════════════
+  📞 SUPORTE
+═══════════════════════════════════════════════════════════════════════
+
+Se tiver problemas:
+1. Leia este arquivo novamente com atenção
+2. Verifique os logs em det_robot\logs\
+3. Execute INSTALAR_DET.bat novamente
+
+
+═══════════════════════════════════════════════════════════════════════
+  🎉 RESUMO PARA USAR
+═══════════════════════════════════════════════════════════════════════
+
+   1️⃣  Execute INSTALAR_DET.bat (só na primeira vez)
+
+   2️⃣  Execute ABRIR_DET.bat (sempre que quiser usar)
+
+   3️⃣  Digite os CNPJs
+
+   4️⃣  Selecione o certificado
+
+   5️⃣  Veja os resultados em det_robot\resultados\
+
+
+═══════════════════════════════════════════════════════════════════════
+
+         Desenvolvido com ❤️ por Paulo Sergio - Versão 2.0
+
+═══════════════════════════════════════════════════════════════════════
