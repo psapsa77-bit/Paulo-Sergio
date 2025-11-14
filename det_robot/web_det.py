@@ -152,6 +152,31 @@ async def executar_robot(empresas: list):
         return None
 
 
+def run_async(coro):
+    """
+    Executa uma coroutine de forma segura, garantindo o event loop correto para Python 3.13
+    """
+    # Re-aplicar o fix antes de criar/obter o event loop
+    if sys.platform == 'win32' and sys.version_info >= (3, 13):
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        except Exception:
+            pass
+
+    # Tentar obter event loop existente
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    # Executar a coroutine
+    return loop.run_until_complete(coro)
+
+
 def main():
     """Função principal da interface"""
 
@@ -281,9 +306,9 @@ def main():
             else:
                 st.info(f"🔄 Processando {len(empresas)} empresa(s)...")
 
-                # Executar robô
+                # Executar robô usando nossa função segura
                 with st.spinner("Aguarde... O navegador vai abrir para seleção do certificado"):
-                    resultado = asyncio.run(executar_robot(empresas))
+                    resultado = run_async(executar_robot(empresas))
 
                 if resultado:
                     st.session_state.ultimo_resultado = resultado
