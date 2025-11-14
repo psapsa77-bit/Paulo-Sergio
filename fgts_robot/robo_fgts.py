@@ -3060,48 +3060,130 @@ class RoboFGTS:
                     self.logger.info(f"✅ Total de competências em aberto: {len(competencias_encontradas)}")
                 else:
                     self.logger.warning("⚠️  Nenhuma competência em aberto encontrada")
+                    competencias_encontradas = []
 
             except Exception as e:
                 self.logger.warning(f"Erro ao buscar competências: {str(e)}")
                 self.logger.warning("Continuando com processamento...")
+                competencias_encontradas = []
 
             self.logger.info("")
 
-            # Processar cada empresa
-            self.logger.info("Etapa 4/4: Processando empresas...")
-            self.logger.info(f"  Total de CNPJs: {len(lista_cnpj)}")
+            # ============================================================
+            # RESULTADO FINAL: COMPETÊNCIAS ENCONTRADAS
+            # ============================================================
+            self.logger.info("="*70)
+            self.logger.info("📊 RESULTADO FINAL DO PROCESSAMENTO")
+            self.logger.info("="*70)
             self.logger.info("")
 
-            todos_dados = []
-            for i, cnpj in enumerate(lista_cnpj, 1):
-                self.logger.info(f"Processando {i}/{len(lista_cnpj)}: {cnpj}")
+            if competencias_encontradas:
+                # Preparar dados para exportação
+                dados_resultado = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "cnpjs_processados": lista_cnpj,
+                    "total_competencias": len(competencias_encontradas),
+                    "competencias_em_aberto": competencias_encontradas
+                }
 
+                # Mostrar resultado no log
+                self.logger.info(f"🏢 CNPJs Processados: {', '.join(lista_cnpj)}")
+                self.logger.info(f"📋 Total de Competências em Aberto: {len(competencias_encontradas)}")
+                self.logger.info("")
+                self.logger.info("📅 Competências Encontradas:")
+                for i, comp in enumerate(competencias_encontradas, 1):
+                    self.logger.info(f"  {i}. {comp}")
+                self.logger.info("")
+
+                # Salvar resultado em JSON
                 try:
-                    guias = await self._processar_empresa(cnpj)
-                    todos_dados.extend(guias)
-
-                    if guias:
-                        self.logger.info(f"  ✓ {len(guias)} guias extraídas de {cnpj}")
-                    else:
-                        self.logger.warning(f"  ⚠ Nenhuma guia encontrada para {cnpj}")
-
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    resultado_path = config.LOGS_DIR / f"resultado_final_{timestamp}.json"
+                    with open(resultado_path, 'w', encoding='utf-8') as f:
+                        json.dump(dados_resultado, f, ensure_ascii=False, indent=2)
+                    self.logger.info(f"💾 Resultado salvo em JSON: {resultado_path}")
                 except Exception as e:
-                    self.logger.error(f"  ❌ Erro ao processar {cnpj}: {str(e)}")
-                    self.logger.exception("  Traceback completo:")
-                    continue
+                    self.logger.warning(f"Erro ao salvar JSON: {str(e)}")
 
-            # Exportar resultados
-            self.logger.info("")
-            self.logger.info("="*60)
-            if todos_dados:
-                self.logger.info("Exportando resultados...")
-                self._exportar_excel(todos_dados)
-                self.logger.info(f"✅ Processamento concluído: {len(todos_dados)} guias extraídas")
+                # Salvar resultado em Excel
+                try:
+                    import pandas as pd
+
+                    # Criar DataFrame com as competências
+                    df = pd.DataFrame({
+                        'CNPJ': [lista_cnpj[0]] * len(competencias_encontradas),
+                        'Competência': competencias_encontradas,
+                        'Status': ['Em Aberto'] * len(competencias_encontradas)
+                    })
+
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    excel_path = config.LOGS_DIR / f"competencias_em_aberto_{timestamp}.xlsx"
+                    df.to_excel(excel_path, index=False, sheet_name='Competências')
+                    self.logger.info(f"📊 Resultado salvo em Excel: {excel_path}")
+                except ImportError:
+                    self.logger.warning("⚠️  Pandas não instalado. Excel não foi gerado.")
+                    self.logger.warning("   Instale com: pip install pandas openpyxl")
+                except Exception as e:
+                    self.logger.warning(f"Erro ao salvar Excel: {str(e)}")
+
+                self.logger.info("")
+                self.logger.info("="*70)
+                self.logger.info("✅ PROCESSAMENTO CONCLUÍDO COM SUCESSO!")
+                self.logger.info("="*70)
+                return True
+
             else:
-                self.logger.warning("⚠ Nenhum dado foi extraído")
+                self.logger.warning("="*70)
+                self.logger.warning("⚠️  NENHUMA COMPETÊNCIA ENCONTRADA")
+                self.logger.warning("="*70)
+                self.logger.warning("")
+                self.logger.warning("Possíveis causas:")
+                self.logger.warning("  1. Não há débitos em aberto para esta empresa")
+                self.logger.warning("  2. O dropdown não abriu corretamente")
+                self.logger.warning("  3. Verifique os screenshots em logs/")
+                self.logger.warning("")
+                return False
 
-            self.logger.info("="*60)
-            return True
+            # ============================================================
+            # ETAPA 4 DESABILITADA - NÃO PROCESSAR EMPRESAS
+            # O resultado final são as COMPETÊNCIAS encontradas acima
+            # ============================================================
+
+            # # Processar cada empresa
+            # self.logger.info("Etapa 4/4: Processando empresas...")
+            # self.logger.info(f"  Total de CNPJs: {len(lista_cnpj)}")
+            # self.logger.info("")
+            #
+            # todos_dados = []
+            # for i, cnpj in enumerate(lista_cnpj, 1):
+            #     self.logger.info(f"Processando {i}/{len(lista_cnpj)}: {cnpj}")
+            #
+            #     try:
+            #         guias = await self._processar_empresa(cnpj)
+            #         todos_dados.extend(guias)
+            #
+            #         if guias:
+            #             self.logger.info(f"  ✓ {len(guias)} guias extraídas de {cnpj}")
+            #         else:
+            #             self.logger.warning(f"  ⚠ Nenhuma guia encontrada para {cnpj}")
+            #
+            #     except Exception as e:
+            #         self.logger.error(f"  ❌ Erro ao processar {cnpj}: {str(e)}")
+            #         self.logger.exception("  Traceback completo:")
+            #         continue
+            #
+            # # Exportar resultados
+            # self.logger.info("")
+            # self.logger.info("="*60)
+            # if todos_dados:
+            #     self.logger.info("Exportando resultados...")
+            #     self._exportar_excel(todos_dados)
+            #     self.logger.info(f"✅ Processamento concluído: {len(todos_dados)} guias extraídas")
+            # else:
+            #     self.logger.warning("⚠ Nenhum dado foi extraído")
+            #
+            # self.logger.info("="*60)
+            # return True
 
         except Exception as e:
             self.logger.error("="*60)
