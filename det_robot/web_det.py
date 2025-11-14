@@ -71,6 +71,85 @@ def formatar_cnpj(cnpj: str) -> str:
     return cnpj
 
 
+def processar_texto_cnpjs(texto: str) -> list:
+    """
+    Processa texto com CNPJs e retorna lista de dicionários
+
+    Formatos aceitos:
+    - CNPJ (um por linha)
+    - CNPJ,Nome da Empresa
+    - CNPJ;Nome da Empresa
+
+    Args:
+        texto: Texto com CNPJs
+
+    Returns:
+        Lista de dicionários com 'cnpj' e 'nome'
+    """
+    empresas = []
+    linhas = texto.strip().split('\n')
+
+    for idx, linha in enumerate(linhas, 1):
+        linha = linha.strip()
+        if not linha or linha.startswith('#'):  # Ignora linhas vazias e comentários
+            continue
+
+        # Tentar separar CNPJ e nome
+        partes = None
+        if ',' in linha:
+            partes = linha.split(',', 1)
+        elif ';' in linha:
+            partes = linha.split(';', 1)
+        elif '\t' in linha:
+            partes = linha.split('\t', 1)
+
+        if partes and len(partes) >= 2:
+            cnpj_raw = partes[0].strip()
+            nome = partes[1].strip()
+        else:
+            cnpj_raw = linha.strip()
+            nome = f"Empresa {idx}"
+
+        # Limpar CNPJ (remover tudo que não é número)
+        cnpj = ''.join(filter(str.isdigit, cnpj_raw))
+
+        # Validar CNPJ (14 dígitos)
+        if len(cnpj) == 14:
+            empresas.append({
+                "cnpj": cnpj,
+                "nome": nome
+            })
+
+    return empresas
+
+
+def processar_arquivo_upload(arquivo) -> list:
+    """
+    Processa arquivo TXT ou JSON com CNPJs
+
+    Args:
+        arquivo: Arquivo uploaded pelo Streamlit
+
+    Returns:
+        Lista de dicionários com 'cnpj' e 'nome'
+    """
+    try:
+        conteudo = arquivo.read().decode('utf-8')
+
+        # Se for JSON
+        if arquivo.name.endswith('.json'):
+            empresas = json.loads(conteudo)
+            if isinstance(empresas, list):
+                return empresas
+
+        # Se for TXT ou outro
+        return processar_texto_cnpjs(conteudo)
+
+    except Exception as e:
+        st.error(f"Erro ao processar arquivo: {str(e)}")
+        return []
+
+
 def main():
     # Inicializar session_state
     if "mensagens_data" not in st.session_state:
@@ -79,8 +158,10 @@ def main():
         st.session_state.resultados = None
     if "logs" not in st.session_state:
         st.session_state.logs = []
-    if "empresas" not in st.session_state:
-        st.session_state.empresas = carregar_empresas_json()
+    if "lista_cnpj_texto" not in st.session_state:
+        st.session_state.lista_cnpj_texto = ""
+    if "empresas_processadas" not in st.session_state:
+        st.session_state.empresas_processadas = []
 
     # Título principal
     st.title("🤖 Robô DET - Verificador de Mensagens")
@@ -112,42 +193,144 @@ def main():
             st.rerun()
 
     # Tabs principais
-    tab1, tab2, tab3, tab4 = st.tabs(["🚀 Processar", "📊 Resultados", "🏢 Empresas", "📝 Logs"])
+    tab1, tab2, tab3 = st.tabs(["🚀 Processar", "📊 Resultados", "📝 Logs"])
 
     # TAB 1: Processar
     with tab1:
-        st.header("🚀 Processar Verificação")
+        st.header("🚀 Processar Verificação de Mensagens")
 
-        col1, col2 = st.columns([2, 1])
+        # Opções de entrada
+        st.subheader("📋 Informar Empresas")
 
-        with col1:
-            st.subheader("📋 Empresas Cadastradas")
+        metodo_input = st.radio(
+            "Escolha o método de entrada:",
+            ["✍️ Digitar CNPJs", "📁 Upload de Arquivo"],
+            horizontal=True
+        )
 
-            if st.session_state.empresas:
-                st.success(f"✅ {len(st.session_state.empresas)} empresa(s) cadastrada(s)")
+        st.divider()
 
-                # Mostrar lista de empresas
-                for idx, empresa in enumerate(st.session_state.empresas):
-                    with st.expander(f"📋 {empresa['nome']} - {formatar_cnpj(empresa['cnpj'])}"):
-                        st.text(f"CNPJ: {formatar_cnpj(empresa['cnpj'])}")
-                        st.text(f"Nome: {empresa['nome']}")
-            else:
-                st.warning("⚠️ Nenhuma empresa cadastrada. Vá para a aba 'Empresas' para adicionar.")
+        empresas_para_processar = []
+
+        if metodo_input == "✍️ Digitar CNPJs":
+            st.markdown("""
+            **Formatos aceitos:**
+            - `CNPJ` (um por linha) - Ex: `12345678000199`
+            - `CNPJ,Nome da Empresa` - Ex: `12345678000199,Minha Empresa Ltda`
+            - `CNPJ;Nome da Empresa` - Ex: `12345678000199;Minha Empresa Ltda`
+
+            💡 **Dica:** Você pode usar CNPJ com ou sem formatação (pontos e traços)
+            """)
+
+            lista_cnpj_texto = st.text_area(
+                "Digite os CNPJs (um por linha):",
+                value=st.session_state.lista_cnpj_texto,
+                height=200,
+                placeholder="12345678000199,Empresa Exemplo 1\n98765432000188,Empresa Exemplo 2\n11223344000155",
+                help="Digite um CNPJ por linha. Opcionalmente, adicione vírgula e o nome da empresa"
+            )
+
+            if lista_cnpj_texto.strip():
+                empresas_para_processar = processar_texto_cnpjs(lista_cnpj_texto)
+                st.session_state.lista_cnpj_texto = lista_cnpj_texto
+
+                if empresas_para_processar:
+                    st.success(f"✅ {len(empresas_para_processar)} empresa(s) identificada(s)")
+
+                    # Preview das empresas
+                    with st.expander("👁️ Visualizar empresas identificadas"):
+                        for emp in empresas_para_processar:
+                            st.text(f"• {emp['nome']} - {formatar_cnpj(emp['cnpj'])}")
+                else:
+                    st.warning("⚠️ Nenhum CNPJ válido encontrado")
+
+        else:  # Upload de arquivo
+            st.markdown("""
+            **Formatos aceitos:**
+            - **TXT**: Um CNPJ por linha (com ou sem nome)
+            - **JSON**: Array de objetos `[{"cnpj": "...", "nome": "..."}]`
+            """)
+
+            uploaded_file = st.file_uploader(
+                "Selecione o arquivo com os CNPJs:",
+                type=['txt', 'json'],
+                help="Arquivo TXT ou JSON com lista de CNPJs"
+            )
+
+            if uploaded_file:
+                empresas_para_processar = processar_arquivo_upload(uploaded_file)
+
+                if empresas_para_processar:
+                    st.success(f"✅ {len(empresas_para_processar)} empresa(s) carregada(s) do arquivo")
+
+                    # Preview das empresas
+                    with st.expander("👁️ Visualizar empresas do arquivo"):
+                        for emp in empresas_para_processar:
+                            st.text(f"• {emp['nome']} - {formatar_cnpj(emp['cnpj'])}")
+                else:
+                    st.warning("⚠️ Nenhum CNPJ válido encontrado no arquivo")
+
+            # Exemplo de arquivo para download
+            st.markdown("---")
+            st.markdown("**📥 Baixar arquivo de exemplo:**")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                exemplo_txt = """# Exemplo de arquivo TXT para Robô DET
+# Formato: CNPJ,Nome da Empresa (um por linha)
+
+12345678000199,Empresa Exemplo 1 Ltda
+98765432000188,Empresa Exemplo 2 S/A
+11223344000155,Empresa Exemplo 3
+
+# Você também pode usar apenas o CNPJ:
+44556677000199
+"""
+                st.download_button(
+                    label="📄 Exemplo TXT",
+                    data=exemplo_txt,
+                    file_name="empresas_exemplo.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+
+            with col2:
+                exemplo_json = json.dumps([
+                    {"cnpj": "12345678000199", "nome": "Empresa Exemplo 1 Ltda"},
+                    {"cnpj": "98765432000188", "nome": "Empresa Exemplo 2 S/A"},
+                    {"cnpj": "11223344000155", "nome": "Empresa Exemplo 3"}
+                ], ensure_ascii=False, indent=2)
+
+                st.download_button(
+                    label="📄 Exemplo JSON",
+                    data=exemplo_json,
+                    file_name="empresas_exemplo.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+
+        st.divider()
+
+        # Botão de processar
+        col1, col2, col3 = st.columns([1, 2, 1])
 
         with col2:
-            st.subheader("▶️ Executar")
-
-            if st.session_state.empresas:
-                if st.button("🚀 INICIAR VERIFICAÇÃO", type="primary", use_container_width=True):
+            if empresas_para_processar:
+                if st.button("🚀 INICIAR VERIFICAÇÃO", type="primary", use_container_width=True, key="btn_processar"):
                     limpar_logs()
                     adicionar_log("🤖 Iniciando Robô DET...")
+                    adicionar_log(f"📋 {len(empresas_para_processar)} empresa(s) serão processadas")
 
-                    with st.spinner("🔄 Processando..."):
+                    # Salvar empresas processadas
+                    st.session_state.empresas_processadas = empresas_para_processar
+
+                    with st.spinner("🔄 Processando... Isso pode levar alguns minutos..."):
                         try:
                             robo = RobotDET(headless=headless)
 
                             # Executar processamento
-                            sucesso = asyncio.run(robo.processar_empresas(st.session_state.empresas))
+                            sucesso = asyncio.run(robo.processar_empresas(empresas_para_processar))
 
                             if sucesso:
                                 adicionar_log("✅ Processamento concluído com sucesso!")
@@ -166,7 +349,7 @@ def main():
 
                                 if arquivos_html:
                                     st.session_state.resultados = arquivos_html[0]
-                                    adicionar_log(f"Arquivo HTML gerado: {arquivos_html[0].name}")
+                                    adicionar_log(f"📄 Arquivo HTML gerado: {arquivos_html[0].name}")
                             else:
                                 adicionar_log("❌ Processamento falhou")
                                 st.error("❌ Processamento falhou. Verifique os logs.")
@@ -177,7 +360,7 @@ def main():
 
                     st.rerun()
             else:
-                st.warning("⚠️ Cadastre empresas primeiro")
+                st.info("ℹ️ Informe os CNPJs das empresas para iniciar a verificação")
 
         st.divider()
 
@@ -349,108 +532,8 @@ def main():
                                 key=f"download_{arquivo.name}"
                             )
 
-    # TAB 3: Empresas
+    # TAB 3: Logs
     with tab3:
-        st.header("🏢 Gerenciar Empresas")
-
-        col1, col2 = st.columns([2, 1])
-
-        with col1:
-            st.subheader("➕ Adicionar Empresa")
-
-            with st.form("form_adicionar_empresa"):
-                nome_empresa = st.text_input("Nome da Empresa", placeholder="Ex: Minha Empresa Ltda")
-                cnpj_empresa = st.text_input("CNPJ", placeholder="12345678000199", max_chars=14)
-
-                submitted = st.form_submit_button("➕ Adicionar", type="primary", use_container_width=True)
-
-                if submitted:
-                    if nome_empresa and cnpj_empresa:
-                        # Remover formatação do CNPJ
-                        cnpj_limpo = ''.join(filter(str.isdigit, cnpj_empresa))
-
-                        if len(cnpj_limpo) == 14:
-                            # Verificar se já existe
-                            if not any(e['cnpj'] == cnpj_limpo for e in st.session_state.empresas):
-                                nova_empresa = {
-                                    "nome": nome_empresa,
-                                    "cnpj": cnpj_limpo
-                                }
-                                st.session_state.empresas.append(nova_empresa)
-                                salvar_empresas_json(st.session_state.empresas)
-                                st.success(f"✅ Empresa {nome_empresa} adicionada!")
-                                st.rerun()
-                            else:
-                                st.error("❌ CNPJ já cadastrado!")
-                        else:
-                            st.error("❌ CNPJ deve ter 14 dígitos!")
-                    else:
-                        st.error("❌ Preencha todos os campos!")
-
-        with col2:
-            st.subheader("📊 Estatísticas")
-            st.metric("Total de Empresas", len(st.session_state.empresas))
-
-        st.divider()
-
-        # Lista de empresas
-        st.subheader("📋 Empresas Cadastradas")
-
-        if st.session_state.empresas:
-            for idx, empresa in enumerate(st.session_state.empresas):
-                col1, col2, col3 = st.columns([3, 2, 1])
-
-                with col1:
-                    st.text(f"📋 {empresa['nome']}")
-
-                with col2:
-                    st.text(formatar_cnpj(empresa['cnpj']))
-
-                with col3:
-                    if st.button("🗑️", key=f"delete_{idx}"):
-                        st.session_state.empresas.pop(idx)
-                        salvar_empresas_json(st.session_state.empresas)
-                        st.rerun()
-        else:
-            st.info("📭 Nenhuma empresa cadastrada")
-
-        st.divider()
-
-        # Importar/Exportar
-        st.subheader("📁 Importar/Exportar")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Exportar
-            if st.session_state.empresas:
-                json_empresas = json.dumps(st.session_state.empresas, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="📥 Exportar Empresas (JSON)",
-                    data=json_empresas,
-                    file_name=f"empresas_det_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-
-        with col2:
-            # Importar
-            uploaded_file = st.file_uploader("📤 Importar Empresas (JSON)", type=['json'])
-            if uploaded_file:
-                try:
-                    empresas_importadas = json.load(uploaded_file)
-                    if isinstance(empresas_importadas, list):
-                        st.session_state.empresas = empresas_importadas
-                        salvar_empresas_json(st.session_state.empresas)
-                        st.success(f"✅ {len(empresas_importadas)} empresa(s) importada(s)!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Formato de arquivo inválido!")
-                except Exception as e:
-                    st.error(f"❌ Erro ao importar: {str(e)}")
-
-    # TAB 4: Logs
-    with tab4:
         st.header("📝 Logs do Sistema")
 
         col1, col2 = st.columns([3, 1])
