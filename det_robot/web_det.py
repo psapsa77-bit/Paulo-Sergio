@@ -10,6 +10,19 @@ import json
 from pathlib import Path
 from datetime import datetime
 import sys
+import platform
+
+# Fix para Python 3.13+ no Windows
+if sys.platform == 'win32' and sys.version_info >= (3, 8):
+    try:
+        # Para Python 3.13+, usar WindowsSelectorEventLoopPolicy
+        if sys.version_info >= (3, 13):
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # Para Python 3.8-3.12, usar WindowsProactorEventLoopPolicy se disponível
+        elif hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass  # Ignorar erros de configuração do event loop
 
 # Adicionar diretório pai ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))

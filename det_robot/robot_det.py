@@ -9,6 +9,8 @@ Descrição:
 """
 
 import asyncio
+import sys
+import platform
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -17,6 +19,18 @@ import json
 from playwright.async_api import async_playwright, Browser, Page, BrowserContext
 
 from . import config
+
+# Fix para Python 3.13+ no Windows
+if sys.platform == 'win32' and sys.version_info >= (3, 8):
+    try:
+        # Para Python 3.13+, usar WindowsSelectorEventLoopPolicy
+        if sys.version_info >= (3, 13):
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # Para Python 3.8-3.12, usar WindowsProactorEventLoopPolicy se disponível
+        elif hasattr(asyncio, 'WindowsProactorEventLoopPolicy'):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass  # Ignorar erros de configuração do event loop
 
 
 class RobotDET:

@@ -227,6 +227,34 @@ pip install playwright
 python -m playwright install chromium
 ```
 
+### Problema: NotImplementedError no Windows com Python 3.13
+
+**Sintoma:**
+```
+NotImplementedError
+File "asyncio\base_events.py", line 539, in _make_subprocess_transport
+    raise NotImplementedError
+```
+
+**Solução:**
+Este problema foi corrigido automaticamente na versão 1.0.1. Se ainda ocorrer:
+
+1. Certifique-se de estar usando a versão mais recente:
+```bash
+git pull origin main
+```
+
+2. Se o problema persistir, use Python 3.12 ou inferior:
+```bash
+# Desinstale Python 3.13
+# Instale Python 3.12 de: https://www.python.org/downloads/
+```
+
+**Detalhes técnicos:**
+- Consulte `det_robot/SOLUCAO_PYTHON313.md` para mais informações
+- A correção já está implementada nos arquivos do robô
+- É um problema de compatibilidade entre Python 3.13 e Playwright
+
 ## 📝 Logs
 
 Os logs são salvos automaticamente em:
