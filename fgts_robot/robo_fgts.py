@@ -1961,6 +1961,7 @@ class RoboFGTS:
                 opcoes_encontradas = await self.page.evaluate("""
                     () => {
                         const opcoes = [];
+                        const regexCompetencia = /^\d{2}\/\d{4}$/; // Formato MM/YYYY
 
                         // Procurar por listas visíveis (ul, ol, div com role listbox, etc)
                         const listas = document.querySelectorAll('ul, ol, [role="listbox"], [role="menu"], .dropdown-menu, .options, .select-options');
@@ -1980,8 +1981,8 @@ class RoboFGTS:
                                              item.getAttribute('value') ||
                                              texto;
 
-                                if (texto && texto.length > 0) {
-                                    // Filtrar opções que parecem ser competências (formato MM/YYYY ou similar)
+                                // FILTRAR: Só adicionar se for no formato MM/YYYY
+                                if (texto && regexCompetencia.test(texto)) {
                                     opcoes.push({
                                         texto: texto,
                                         valor: valor
@@ -2012,6 +2013,7 @@ class RoboFGTS:
                     opcoes_alternativas = await self.page.evaluate("""
                         () => {
                             const opcoes = [];
+                            const regexCompetencia = /^\d{2}\/\d{4}$/; // Formato MM/YYYY
 
                             // Procurar datalist associado ao input
                             const input = document.getElementById('selectCompetencia');
@@ -2022,27 +2024,33 @@ class RoboFGTS:
                                 if (datalist) {
                                     const options = datalist.querySelectorAll('option');
                                     for (const opt of options) {
-                                        if (opt.value || opt.innerText) {
+                                        const texto = opt.innerText || opt.value;
+                                        if (texto && regexCompetencia.test(texto.trim())) {
                                             opcoes.push({
-                                                texto: opt.innerText || opt.value,
-                                                valor: opt.value || opt.innerText
+                                                texto: texto.trim(),
+                                                valor: opt.value || texto.trim()
                                             });
                                         }
                                     }
                                 }
                             }
 
-                            // Procurar por divs que possam conter as opções
+                            // Procurar por divs/spans que possam conter as opções no formato MM/YYYY
                             if (opcoes.length === 0) {
-                                const allDivs = document.querySelectorAll('div');
-                                for (const div of allDivs) {
-                                    const texto = div.innerText ? div.innerText.trim() : '';
-                                    // Verificar se parece uma competência (MM/YYYY)
-                                    if (/^\d{2}\/\d{4}$/.test(texto)) {
-                                        opcoes.push({
-                                            texto: texto,
-                                            valor: texto
-                                        });
+                                const allElements = document.querySelectorAll('div, span, li, td');
+                                const competenciasUnicas = new Set();
+
+                                for (const el of allElements) {
+                                    const texto = el.innerText ? el.innerText.trim() : '';
+                                    // Verificar se parece uma competência (MM/YYYY) e está visível
+                                    if (regexCompetencia.test(texto) && (el.offsetWidth || el.offsetHeight)) {
+                                        if (!competenciasUnicas.has(texto)) {
+                                            competenciasUnicas.add(texto);
+                                            opcoes.push({
+                                                texto: texto,
+                                                valor: texto
+                                            });
+                                        }
                                     }
                                 }
                             }
