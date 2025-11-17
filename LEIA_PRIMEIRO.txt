@@ -1,0 +1,93 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║                        DET ROBOT                              ║
+║          Extrator de Mensagens do DET                         ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+BEM-VINDO!
+
+Este programa extrai mensagens do DET (Domicílio Eletrônico
+Trabalhista) automaticamente, SEM abrir as mensagens (não marca
+como lida).
+
+
+═══════════════════════════════════════════════════════════════
+INSTALAÇÃO (PRIMEIRA VEZ)
+═══════════════════════════════════════════════════════════════
+
+1. Abra o terminal nesta pasta
+
+2. Execute:
+
+   ./INSTALAR_TUDO.sh
+
+   (Isso vai instalar tudo automaticamente)
+
+3. Aguarde alguns minutos (o script faz tudo sozinho!)
+
+
+═══════════════════════════════════════════════════════════════
+COMO USAR (APÓS INSTALAÇÃO)
+═══════════════════════════════════════════════════════════════
+
+1. Execute:
+
+   ./USAR_DET_ROBOT.sh
+
+2. Uma página web abrirá automaticamente no navegador
+
+3. Na página:
+
+   a) Clique em "Iniciar Navegador"
+   b) Clique em "Fazer Login"
+   c) FAÇA LOGIN NO NAVEGADOR que abrir
+   d) Volte para a página e clique em "Extrair Mensagens"
+
+4. Pronto! Os dados serão salvos na pasta dados_det/
+
+
+═══════════════════════════════════════════════════════════════
+REQUISITOS DO SISTEMA
+═══════════════════════════════════════════════════════════════
+
+✅ Linux (Ubuntu, Debian, Fedora, etc)
+✅ Python 3.9 ou superior
+✅ Um navegador: Chrome, Chromium ou Firefox
+✅ Conexão com internet
+
+
+═══════════════════════════════════════════════════════════════
+RESUMO RÁPIDO
+═══════════════════════════════════════════════════════════════
+
+PRIMEIRA VEZ:
+  ./INSTALAR_TUDO.sh
+
+USAR:
+  ./USAR_DET_ROBOT.sh
+
+
+═══════════════════════════════════════════════════════════════
+PROBLEMAS?
+═══════════════════════════════════════════════════════════════
+
+Veja o arquivo: SOLUCAO_PROBLEMAS_DET.md
+
+Ou execute: python3 diagnostico_det.py
+
+
+═══════════════════════════════════════════════════════════════
+ARQUIVOS IMPORTANTES
+═══════════════════════════════════════════════════════════════
+
+LEIA_PRIMEIRO.txt              ← Você está aqui
+INSTALAR_TUDO.sh              ← Instalador automático
+USAR_DET_ROBOT.sh             ← Executar o programa
+DET_ROBOT.md                  ← Manual completo
+SOLUCAO_PROBLEMAS_DET.md      ← Soluções de problemas
+
+
+═══════════════════════════════════════════════════════════════
+
+Desenvolvido para facilitar sua vida! 🚀
