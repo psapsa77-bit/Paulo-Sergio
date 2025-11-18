@@ -82,10 +82,20 @@ ARQUIVOS IMPORTANTES
 ═══════════════════════════════════════════════════════════════
 
 LEIA_PRIMEIRO.txt              ← Você está aqui
-INSTALAR_TUDO.sh              ← Instalador automático
-USAR_DET_ROBOT.sh             ← Executar o programa
-DET_ROBOT.md                  ← Manual completo
-SOLUCAO_PROBLEMAS_DET.md      ← Soluções de problemas
+
+INSTALADORES:
+  INSTALAR_TUDO.sh            ← Linux/Mac
+  INSTALAR_TUDO.bat           ← Windows (CMD)
+  INSTALAR_TUDO.ps1           ← Windows (PowerShell)
+
+EXECUTAR:
+  USAR_DET_ROBOT.sh           ← Linux/Mac
+  USAR_DET_ROBOT.bat          ← Windows
+
+DOCUMENTAÇÃO:
+  DET_ROBOT.md                ← Manual completo
+  README_DET_ROBOT.md         ← README visual
+  SOLUCAO_PROBLEMAS_DET.md    ← Soluções de problemas
 
 
 ═══════════════════════════════════════════════════════════════
