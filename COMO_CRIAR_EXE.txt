@@ -1,0 +1,253 @@
+========================================
+  COMO CRIAR EXECUTÁVEL (.EXE)
+  FGTS Digital Robot
+========================================
+
+PARA QUE SERVE?
+===============
+
+Criar um arquivo .exe que:
+  ✅ Funciona SEM instalar Python
+  ✅ Pode ser copiado para outros computadores
+  ✅ Abre com duplo clique
+  ✅ Inclui tudo dentro de um único arquivo
+
+
+PRÉ-REQUISITOS
+==============
+
+APENAS PARA CRIAR O .EXE (só uma vez):
+  - Python instalado (versão 3.9+)
+  - Internet (para baixar ferramentas)
+  - Espaço em disco: ~2 GB
+
+
+COMO CRIAR O .EXE
+=================
+
+>>> MÉTODO 1 - MAIS FÁCIL (Duplo clique) <<<
+
+  1. Localize o arquivo: CRIAR_EXE.bat
+
+  2. Dê DUPLO CLIQUE nele
+
+  3. Escolha a opção:
+     A) Interface Gráfica (mais fácil)
+     B) Linha de comando (automático)
+
+  4. Aguarde 10-20 minutos
+
+  5. Pronto! O .exe estará na pasta "dist"
+
+
+>>> MÉTODO 2 - Linha de Comando <<<
+
+  1. Abra o CMD na pasta do projeto
+
+  2. Execute:
+     python criar_executavel.py
+
+  3. Aguarde o processo
+
+  4. O .exe estará em: dist\FGTS_Digital_Robot.exe
+
+
+ONDE FICA O .EXE DEPOIS DE CRIADO?
+===================================
+
+Pasta: dist\FGTS_Digital_Robot.exe
+
+Tamanho: ~300-500 MB (normal, inclui tudo!)
+
+
+COMO USAR O .EXE CRIADO
+========================
+
+1. Copie o arquivo FGTS_Digital_Robot.exe
+
+2. Cole em QUALQUER computador Windows
+   (não precisa instalar nada)
+
+3. Duplo clique no arquivo
+
+4. Aguarde abrir (primeira vez demora mais)
+
+5. O navegador abrirá automaticamente
+
+6. Use normalmente!
+
+
+DISTRIBUIR PARA OUTRAS PESSOAS
+===============================
+
+1. Copie o arquivo .exe para um pen drive
+
+2. OU envie por email/WhatsApp
+   (mas é grande, ~500 MB)
+
+3. OU coloque no Google Drive/Dropbox
+
+4. A pessoa só precisa:
+   - Baixar o arquivo
+   - Duplo clicar
+   - Usar!
+
+
+PROBLEMAS COMUNS
+================
+
+>>> "Windows Defender bloqueou"
+
+  É normal! O Windows bloqueia executáveis desconhecidos.
+
+  Solução:
+  1. Clique em "Mais informações"
+  2. Clique em "Executar assim mesmo"
+
+
+>>> "O programa não abre"
+
+  Solução:
+  1. Clique com botão direito no .exe
+  2. Escolha "Executar como administrador"
+
+
+>>> ".exe muito grande"
+
+  Normal! Ele inclui:
+  - Python completo
+  - Todas as bibliotecas
+  - Navegador Chromium
+  - Interface Streamlit
+
+  Tamanho típico: 300-500 MB
+
+
+>>> "Demora muito para abrir"
+
+  Na primeira execução é normal demorar 30-60 segundos.
+
+  O programa está:
+  - Extraindo arquivos temporários
+  - Iniciando Python interno
+  - Carregando bibliotecas
+
+  Das próximas vezes será mais rápido!
+
+
+OPÇÕES AVANÇADAS
+================
+
+>>> Criar .exe MENOR
+
+  Edite o arquivo: criar_executavel.py
+
+  Mude a linha:
+    upx=True
+
+  Para:
+    upx=True,
+    upx_exclude=[],
+
+  E adicione ao início:
+    pip install upx
+
+
+>>> Adicionar Ícone
+
+  1. Coloque um arquivo icone.ico na pasta
+
+  2. Edite criar_executavel.py
+
+  3. Mude:
+     icon=None
+
+     Para:
+     icon='icone.ico'
+
+
+>>> Criar Instalador
+
+  Após criar o .exe, use:
+  - Inno Setup (Windows)
+  - NSIS
+
+  Para criar um instalador profissional.
+
+
+TEMPO DE CRIAÇÃO
+================
+
+Computador rápido:   10-15 minutos
+Computador médio:    15-20 minutos
+Computador lento:    20-30 minutos
+
+
+ESPAÇO NECESSÁRIO
+=================
+
+Durante criação:  ~2 GB
+Executável final: ~300-500 MB
+
+
+DEPOIS DE CRIAR
+===============
+
+Você pode:
+
+1. DELETAR a pasta do projeto original
+   (o .exe já tem tudo dentro)
+
+2. DESINSTALAR o Python
+   (o .exe não precisa mais)
+
+3. DISTRIBUIR o .exe
+   (funciona em qualquer Windows)
+
+
+COMPATIBILIDADE
+===============
+
+O .exe funciona em:
+  ✅ Windows 10
+  ✅ Windows 11
+  ✅ Windows Server 2016+
+
+Não funciona em:
+  ❌ Windows 7 (muito antigo)
+  ❌ Linux
+  ❌ Mac
+
+
+PERGUNTAS FREQUENTES
+====================
+
+P: Preciso criar o .exe toda vez?
+R: Não! Crie uma vez e use sempre.
+
+P: Posso vender o .exe?
+R: Depende da licença. Verifique com o autor.
+
+P: O .exe tem vírus?
+R: Não! Mas antivírus podem alertar (falso positivo).
+
+P: Como atualizar o .exe?
+R: Precisa criar um novo com o código atualizado.
+
+P: Posso criar no Linux/Mac?
+R: Sim, mas o .exe só funciona no Windows.
+
+
+SUPORTE
+=======
+
+Se tiver problemas:
+
+1. Verifique se Python está instalado
+2. Execute: python diagnostico_fgts.py
+3. Tente novamente
+4. Entre em contato com suporte
+
+
+BOA SORTE! 🚀
+========================================
