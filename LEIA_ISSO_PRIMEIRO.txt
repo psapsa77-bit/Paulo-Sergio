@@ -1,0 +1,195 @@
+========================================
+  INSTALACAO AUTOMATIZADA COMPLETA
+  LEIA ISSO PRIMEIRO!
+========================================
+
+IMPORTANTE: Este e o metodo MAIS FACIL!
+=======================================
+
+
+O QUE VAI ACONTECER?
+=====================
+
+Voce so precisa:
+
+  1. Duplo clique em: INSTALAR_E_CRIAR_EXE.bat
+
+  2. Aguardar (20-40 minutos)
+
+  3. Pronto! O .exe estara criado!
+
+
+O SCRIPT FAZ TUDO SOZINHO
+==========================
+
+Automaticamente:
+
+  ✓ Verifica se Python esta instalado
+  ✓ Se nao, instala Python
+  ✓ Instala todas as bibliotecas necessarias
+  ✓ Cria o arquivo .exe
+  ✓ Te avisa quando terminar
+
+
+PASSO A PASSO DETALHADO
+========================
+
+1. Localize o arquivo:
+   INSTALAR_E_CRIAR_EXE.bat
+
+2. Duplo clique nele
+
+3. Uma janela preta vai abrir
+
+4. Leia as informacoes
+
+5. Pressione qualquer tecla para continuar
+
+6. AGUARDE! (20-40 minutos)
+   - Nao feche a janela
+   - Pode ir tomar um cafe
+   - O computador vai trabalhar sozinho
+
+7. Quando terminar, vera:
+   ========================================
+    SUCESSO!
+   ========================================
+
+8. O .exe estara em:
+   pasta-do-projeto\dist\FGTS_Digital_Robot.exe
+
+
+PODE PEDIR PERMISSAO
+=====================
+
+O Windows pode pedir:
+
+  "Deseja permitir que este app faca alteracoes?"
+
+  Clique em: SIM
+
+
+SE PYTHON JA ESTIVER INSTALADO
+===============================
+
+Otimo! O script vai pular a instalacao e ir direto
+para criar o .exe.
+
+
+SE PYTHON NAO ESTIVER INSTALADO
+================================
+
+O script vai:
+
+  1. Tentar instalar via winget (Windows 11)
+  2. Se falhar, baixar do site oficial
+  3. Instalar automaticamente
+  4. Pedir para REINICIAR o script
+
+
+DEPOIS QUE CRIAR O .EXE
+=======================
+
+Voce pode:
+
+  ✓ Copiar o .exe para qualquer PC
+  ✓ Desinstalar Python (nao precisa mais)
+  ✓ Deletar a pasta do projeto (o .exe tem tudo)
+  ✓ Enviar o .exe para outras pessoas
+
+
+QUANTO TEMPO DEMORA?
+====================
+
+Tempo total: 20-40 minutos
+
+  - Instalar Python: 5 minutos
+  - Instalar bibliotecas: 10 minutos
+  - Criar .exe: 10-20 minutos
+
+
+TAMANHOS
+========
+
+Download durante instalacao: ~500 MB
+Executavel final: ~300-500 MB
+
+
+SE DER ERRO
+===========
+
+1. Feche tudo
+
+2. Execute novamente: INSTALAR_E_CRIAR_EXE.bat
+
+3. Se persistir, leia: COMO_CRIAR_EXE.txt
+
+
+INTERNET E NECESSARIA
+======================
+
+Sim! Precisa estar conectado para:
+  - Baixar Python (se necessario)
+  - Baixar bibliotecas
+  - Baixar navegador Chromium
+
+
+COMPATIBILIDADE
+===============
+
+Funciona em:
+  ✓ Windows 10
+  ✓ Windows 11
+  ✓ Windows Server 2016+
+
+Nao funciona em:
+  ✗ Windows 7 ou anterior
+  ✗ Linux
+  ✗ Mac
+
+
+RESUMO ULTRA RAPIDO
+===================
+
+1. Duplo clique: INSTALAR_E_CRIAR_EXE.bat
+2. Aguarde 20-40 minutos
+3. .exe estara em: dist\FGTS_Digital_Robot.exe
+4. Pronto!
+
+
+PROXIMOS PASSOS
+===============
+
+Apos criar o .exe:
+
+1. Teste o .exe:
+   - Duplo clique nele
+   - Aguarde abrir (~1 minuto na 1a vez)
+   - Use normalmente
+
+2. Distribua:
+   - Copie para pen drive
+   - Envie por email/drive
+   - Cole em outros PCs
+
+3. Desinstale Python (opcional):
+   - Configuracoes > Apps > Python > Desinstalar
+
+
+DUVIDAS?
+========
+
+Leia os outros arquivos:
+
+  - COMO_CRIAR_EXE.txt (guia completo)
+  - INSTALAR_FACIL.txt (instalacao manual)
+
+
+VAMOS COMECAR!
+==============
+
+>>> Duplo clique em: INSTALAR_E_CRIAR_EXE.bat
+
+Boa sorte! 🚀
+
+========================================
